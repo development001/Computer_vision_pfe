@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>YOLO Server UI</title>
+    <style>
+      body { font-family: Arial, Helvetica, sans-serif; margin: 16px; }
+      .col { float:left; width:48%; margin-right:2%; }
+      .row:after { content: ""; display: table; clear: both; }
+      button { margin:4px; }
+      #stream { width:100%; border:1px solid #ccc }
+      pre { background:#f6f6f6; padding:8px }
+    </style>
+  </head>
+  <body>
+    <h2>YOLO Server Control</h2>
+
+    <div class="row">
+      <div class="col">
+        <h3>Add Camera</h3>
+        <label>Name</label><br/>
+        <input id="cam-name" placeholder="Camera name" /> <br/>
+        <label>RTSP URL</label><br/>
+        <input id="cam-rtsp" placeholder="rtsp://..." style="width:100%" /> <br/>
+        <button onclick="addCamera()">Add Camera</button>
+
+        <h3>Available Models</h3>
+        <select id="models"></select>
+        <div style="margin-top:8px">
+          <label for="imgsz">Model imgsz:</label>
+          <select id="imgsz">
+            <option value="320">320</option>
+            <option value="480">480</option>
+            <option value="640" selected>640</option>
+            <option value="736">736</option>
+            <option value="1280">1280</option>
+          </select>
+        </div>
+
+        <h3>RTSP Configuration</h3>
+        <div style="margin-top:8px">
+          <label for="rtsp_width">Width:</label>
+          <input type="number" id="rtsp_width" value="640" min="160" max="3840" style="width:80px">
+          <label for="rtsp_height" style="margin-left:10px">Height:</label>
+          <input type="number" id="rtsp_height" value="640" min="120" max="2160" style="width:80px">
+        </div>
+        <div style="margin-top:8px">
+          <label for="rtsp_fps">FPS:</label>
+          <input type="number" id="rtsp_fps" value="15" min="1" max="60" style="width:80px">
+          <label for="rtsp_reconnect_delay" style="margin-left:10px">Reconnect Delay (s):</label>
+          <input type="number" id="rtsp_reconnect_delay" value="3.0" min="0.1" max="30" step="0.1" style="width:80px">
+        </div>
+        <div style="margin-top:8px">
+          <label for="rtsp_buffer_size">Buffer Size:</label>
+          <input type="number" id="rtsp_buffer_size" value="1" min="1" max="10" style="width:80px">
+          <label for="rtsp_read_timeout" style="margin-left:10px">Read Timeout (s):</label>
+          <input type="number" id="rtsp_read_timeout" value="5.0" min="0.1" max="30" step="0.1" style="width:80px">
+        </div>
+        <div style="margin-top:8px">
+          <label for="rtsp_cv2_backend">OpenCV Backend:</label>
+          <select id="rtsp_cv2_backend" style="width:120px">
+            <option value="">Default</option>
+            <option value="FFMPEG">FFMPEG</option>
+            <option value="GSTREAMER">GStreamer</option>
+            <option value="DSHOW">DirectShow</option>
+            <option value="MSMF">Media Foundation</option>
+          </select>
+        </div>
+
+        <h3>Cameras</h3>
+        <div id="cameras"></div>
+
+        <h3>Upload Model</h3>
+        <input type="file" id="model-file" accept=".pt,.onnx" />
+        <button onclick="uploadModel()">Upload Model</button>
+        <div id="upload-status"></div>
+      </div>
+
+      <div class="col">
+        <h3>Jobs</h3>
+        <div id="jobs"></div>
+
+        <h3>Stream Viewer</h3>
+        <div>
+          <img id="stream" src="" alt="stream" />
+        </div>
+      </div>
+    </div>
+
+    <script>
+      async function fetchModels(){
+        let r = await fetch('/models');
+        let j = await r.json();
+        let s = document.getElementById('models');
+        s.innerHTML = '';
+        j.models.forEach(m => { let o = document.createElement('option'); o.value = m; o.text = m; s.appendChild(o); });
+      }
+
+      async function fetchCameras(){
+        let r = await fetch('/cameras');
+        let j = await r.json();
+        let d = document.getElementById('cameras');
+        d.innerHTML = '';
+        for(const id in j.cameras){
+          const cam = j.cameras[id];
+          const div = document.createElement('div');
+          div.innerHTML = `<b>${cam.name}</b> <code>${cam.rtsp}</code><br/>
+            <button onclick="startJob('${id}')">Start job (selected model)</button>
+            <button onclick="viewRaw('${id}')">View raw</button>`;
+          d.appendChild(div);
+        }
+      }
+
+      async function fetchJobs(){
+        let r = await fetch('/jobs');
+        let j = await r.json();
+        let d = document.getElementById('jobs');
+        d.innerHTML = '';
+        for(const id in j){
+          const job = j[id];
+          const div = document.createElement('div');
+          div.innerHTML = `<b>job:</b> ${id} <b>cam:</b> ${job.camera_id} <b>model:</b> ${job.model} <b>status:</b> ${job.status} <br/>
+            <button onclick="viewAI('${id}')">View AI</button>
+            <button onclick="stopJob('${id}')">Stop</button>`;
+          d.appendChild(div);
+        }
+      }
+
+      async function addCamera(){
+        const name = document.getElementById('cam-name').value;
+        const rtsp = document.getElementById('cam-rtsp').value;
+        await fetch('/cameras', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name, rtsp})});
+        await fetchCameras();
+      }
+
+      async function startJob(camera_id){
+        const model = document.getElementById('models').value;
+        const imgsz = parseInt(document.getElementById('imgsz').value || '640');
+        
+        // Get RTSP configuration parameters
+        const rtsp_width = parseInt(document.getElementById('rtsp_width').value || '640');
+        const rtsp_height = parseInt(document.getElementById('rtsp_height').value || '640');
+        const rtsp_fps = parseInt(document.getElementById('rtsp_fps').value || '15');
+        const rtsp_reconnect_delay = parseFloat(document.getElementById('rtsp_reconnect_delay').value || '3.0');
+        const rtsp_buffer_size = parseInt(document.getElementById('rtsp_buffer_size').value || '1');
+        const rtsp_read_timeout = parseFloat(document.getElementById('rtsp_read_timeout').value || '5.0');
+        const rtsp_cv2_backend = document.getElementById('rtsp_cv2_backend').value;
+        
+        const r = await fetch('/jobs/start', {
+          method:'POST', 
+          headers:{'Content-Type':'application/json'}, 
+          body: JSON.stringify({
+            camera_id, 
+            model, 
+            imgsz,
+            rtsp_width,
+            rtsp_height,
+            rtsp_fps,
+            rtsp_reconnect_delay,
+            rtsp_buffer_size,
+            rtsp_read_timeout,
+            rtsp_cv2_backend
+          })
+        });
+        await fetchJobs();
+      }
+
+      async function stopJob(job_id){
+        await fetch('/jobs/stop', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({job_id})});
+        document.getElementById('stream').src = '';
+        await fetchJobs();
+      }
+
+      function viewAI(job_id){
+        document.getElementById('stream').src = `/jobs/${job_id}/mjpeg`;
+      }
+
+      function viewRaw(cam_id){
+        document.getElementById('stream').src = `/cameras/${cam_id}/mjpeg`;
+      }
+
+      async function uploadModel(){
+        const fileInput = document.getElementById('model-file');
+        const file = fileInput.files[0];
+        if(!file){
+          alert('select a file first');
+          return;
+        }
+        const formData = new FormData();
+        formData.append('file', file);
+        const statusDiv = document.getElementById('upload-status');
+        statusDiv.innerHTML = 'uploading...';
+        try{
+          const r = await fetch('/models/upload', {method:'POST', body: formData});
+          const j = await r.json();
+          if(r.ok){
+            statusDiv.innerHTML = `✓ uploaded: ${j.filename}`;
+            fileInput.value = '';
+            setTimeout(()=>{ statusDiv.innerHTML = ''; }, 3000);
+            await fetchModels();
+          } else {
+            statusDiv.innerHTML = `✗ error: ${j.error}`;
+          }
+        } catch(e){
+          statusDiv.innerHTML = `✗ error: ${e.message}`;
+        }
+      }
+
+      // initial load
+      fetchModels();
+      fetchCameras();
+      fetchJobs();
+      setInterval(fetchJobs, 3000);
+    </script>
+  </body>
+</html>
