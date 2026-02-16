@@ -92,8 +92,9 @@ class TrackingWorker(threading.Thread):
                         persist=True, 
                         verbose=False,
                         tracker="bytetrack.yaml",  # Explicitly use ByteTrack (often better than BoT-SORT for stability)
-                        conf=0.25,                 # Ensure confidence isn't filtering too aggressively
+                        conf=0.4,                 # Ensure confidence isn't filtering too aggressively
                         iou=0.5,
+                        track_buffer=60,  # increase if objects re-appear after short occlusions
                         stream=True                # Returns generator for streaming results
                     )
                     
