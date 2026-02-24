@@ -1,0 +1,13 @@
+{
+  "cameras": {
+    "41e2ab81-8ca8-4d81-be9f-1ed5b3350bb9": {
+      "name": "mo",
+      "rtsp": "rtsp://admn:a;ld@192.215.5.5:554/1"
+    },
+    "3fdc71cc-f138-4b6c-8954-af3961248645": {
+      "name": "camra hik",
+      "rtsp": "rtsp://admin:dellai12@192.168.1.87:554/1"
+    }
+  },
+  "jobs": {}
+}

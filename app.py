@@ -1,11 +1,15 @@
 from flask import Flask, request, jsonify, Response, send_from_directory
 from worker import TrackingWorker
+from config import RTSPConfig, TrackerConfig, JobConfig
 from werkzeug.utils import secure_filename
 import os
 import threading
 import uuid
 import time
 import cv2
+import persistence
+import yaml
+import json
 
 app = Flask(__name__)
 
@@ -35,7 +39,45 @@ def available_models():
 cameras = {}   # camera_id -> {name, rtsp}
 jobs = {}      # job_id -> {camera_id, model, worker}
 
+# Trackers directory
+TRACKERS_DIR = os.path.join(os.path.dirname(__file__), 'trackers')
+
+# Ensure trackers directory exists
+if not os.path.exists(TRACKERS_DIR):
+    os.makedirs(TRACKERS_DIR)
+
 jobs_lock = threading.Lock()
+
+# Load state from persistence
+loaded_cameras, loaded_jobs_config = persistence.load_state()
+cameras.update(loaded_cameras)
+
+# Restart jobs
+for jid, j_config in loaded_jobs_config.items():
+    try:
+        # Reconstruct configurations
+        rtsp_config = RTSPConfig.from_dict(j_config)
+        tracker_config = TrackerConfig.from_dict(j_config)
+        
+        config = JobConfig(
+            camera_id=j_config['camera_id'],
+            model_name=j_config['model'],
+            rtsp_url=cameras[j_config['camera_id']]['rtsp'],
+            conf=j_config.get('conf', 0.25),
+            iou=j_config.get('iou', 0.7),
+            rtsp_config=rtsp_config,
+            tracker_config=tracker_config,
+            line_coords=j_config.get('line_coords')
+        )
+        
+        worker = TrackingWorker(config)
+        worker.start()
+        
+        j_config['worker'] = worker
+        jobs[jid] = j_config
+        print(f"Restarted job {jid} for camera {j_config['camera_id']}")
+    except Exception as e:
+        print(f"Failed to restart job {jid}: {e}")
 
 @app.route('/models', methods=['GET'])
 def list_models():
@@ -54,12 +96,50 @@ def add_camera():
         return jsonify({'error': 'rtsp field required'}), 400
     cid = str(uuid.uuid4())
     cameras[cid] = {'name': name, 'rtsp': rtsp}
+    persistence.save_state(cameras, jobs, jobs_lock)
     return jsonify({'camera_id': cid}), 201
+
+@app.route('/cameras/<camera_id>/snapshot')
+def camera_snapshot(camera_id):
+    cam = cameras.get(camera_id)
+    if not cam:
+        return jsonify({'error': 'unknown camera'}), 404
+    rtsp_url = cam['rtsp']
+    
+    # Get RTSP configuration from request parameters
+    width = request.args.get('width', type=int)
+    height = request.args.get('height', type=int)
+    
+    rtsp_kwargs = {}
+    if width: rtsp_kwargs['width'] = width
+    if height: rtsp_kwargs['height'] = height
+    
+    # Use a temporary stream to capture a single frame
+    from rtsp import RTSPVideoStream
+    stream = RTSPVideoStream(rtsp_url, **rtsp_kwargs)
+    stream.start()
+    
+    try:
+        # Wait up to 5 seconds for a frame
+        frame = stream.read(timeout=5.0)
+            
+        if frame is None:
+             return jsonify({'error': 'failed to grab frame'}), 500
+             
+        ok, buf = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
+        if not ok:
+             return jsonify({'error': 'failed to encode frame'}), 500
+             
+        return Response(buf.tobytes(), mimetype='image/jpeg')
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        stream.stop()
 
 @app.route('/jobs', methods=['GET'])
 def list_jobs():
     with jobs_lock:
-        summary = {jid: {'camera_id': j['camera_id'], 'model': j['model'], 'imgsz': j.get('imgsz', 640), 'status': j['worker'].status} for jid, j in jobs.items()}
+        summary = {jid: {'camera_id': j['camera_id'], 'model': j['model'], 'status': j['worker'].status} for jid, j in jobs.items()}
     return jsonify(summary)
 
 @app.route('/jobs/start', methods=['POST'])
@@ -67,65 +147,42 @@ def start_job():
     data = request.json or {}
     camera_id = data.get('camera_id')
     model_name = data.get('model')
-    # optional imgsz/resize (int, e.g. 640, 480, 320)
-    try:
-        imgsz = int(data.get('imgsz', 640))
-    except Exception:
-        return jsonify({'error': 'invalid imgsz value'}), 400
-
-    # RTSP configuration parameters with defaults
-    rtsp_width = int(data.get('rtsp_width', 640))
-    rtsp_height = int(data.get('rtsp_height', 640))
-    rtsp_fps = int(data.get('rtsp_fps', 15))
-    rtsp_reconnect_delay = float(data.get('rtsp_reconnect_delay', 3.0))
-    rtsp_buffer_size = int(data.get('rtsp_buffer_size', 1))
-    rtsp_read_timeout = float(data.get('rtsp_read_timeout', 5.0))
-    rtsp_cv2_backend = data.get('rtsp_cv2_backend')
-
-    if camera_id not in cameras:
+    
+    if not camera_id or camera_id not in cameras:
         return jsonify({'error': 'unknown camera_id'}), 400
-    if model_name not in available_models():
+    if not model_name or model_name not in available_models():
         return jsonify({'error': 'model not available'}), 400
 
+    try:
+        rtsp_config = RTSPConfig.from_dict(data)
+        tracker_config = TrackerConfig.from_dict(data)
+        
+        config = JobConfig(
+            camera_id=camera_id,
+            model_name=model_name,
+            rtsp_url=cameras[camera_id]['rtsp'],
+            conf=float(data.get('conf', 0.25)),
+            iou=float(data.get('iou', 0.7)),
+            rtsp_config=rtsp_config,
+            tracker_config=tracker_config,
+            line_coords=data.get('line_coords')
+        )
+    except Exception as e:
+        return jsonify({'error': f'Invalid configuration: {str(e)}'}), 400
+
     jid = str(uuid.uuid4())
-    worker = TrackingWorker(
-        cameras[camera_id]['rtsp'], 
-        model_name, 
-        imgsz=imgsz,
-        rtsp_width=rtsp_width,
-        rtsp_height=rtsp_height,
-        rtsp_fps=rtsp_fps,
-        rtsp_reconnect_delay=rtsp_reconnect_delay,
-        rtsp_buffer_size=rtsp_buffer_size,
-        rtsp_read_timeout=rtsp_read_timeout,
-        rtsp_cv2_backend=rtsp_cv2_backend
-    )
+    worker = TrackingWorker(config)
     worker.start()
+    
     with jobs_lock:
-        jobs[jid] = {
-            'camera_id': camera_id, 
-            'model': model_name, 
-            'imgsz': imgsz,
-            'rtsp_width': rtsp_width,
-            'rtsp_height': rtsp_height,
-            'rtsp_fps': rtsp_fps,
-            'rtsp_reconnect_delay': rtsp_reconnect_delay,
-            'rtsp_buffer_size': rtsp_buffer_size,
-            'rtsp_read_timeout': rtsp_read_timeout,
-            'rtsp_cv2_backend': rtsp_cv2_backend,
-            'worker': worker
-        }
-    return jsonify({
-        'job_id': jid, 
-        'imgsz': imgsz,
-        'rtsp_width': rtsp_width,
-        'rtsp_height': rtsp_height,
-        'rtsp_fps': rtsp_fps,
-        'rtsp_reconnect_delay': rtsp_reconnect_delay,
-        'rtsp_buffer_size': rtsp_buffer_size,
-        'rtsp_read_timeout': rtsp_read_timeout,
-        'rtsp_cv2_backend': rtsp_cv2_backend
-    }), 201
+        job_data = config.to_dict()
+        job_data['worker'] = worker
+        jobs[jid] = job_data
+        
+    persistence.save_state(cameras, jobs, jobs_lock)
+    response = config.to_dict()
+    response['job_id'] = jid
+    return jsonify(response), 201
 
 @app.route('/jobs/stop', methods=['POST'])
 def stop_job():
@@ -137,6 +194,7 @@ def stop_job():
         worker = jobs[jid]['worker']
         worker.stop()
         del jobs[jid]
+    persistence.save_state(cameras, jobs, jobs_lock)
     return jsonify({'stopped': jid})
 
 @app.route('/jobs/<job_id>/status', methods=['GET'])
@@ -170,26 +228,36 @@ def camera_mjpeg(camera_id):
     cam = cameras.get(camera_id)
     if not cam:
         return 'unknown camera', 404
-    rtsp = cam['rtsp']
+    rtsp_url = cam['rtsp']
+    
+    # We use RTSPVideoStream to handle the connection robustly
+    # Note: This creates a new connection for every viewer. 
+    # Ideally, you'd want a shared stream manager, but for this request we'll just use the class.
+    from rtsp import RTSPVideoStream
+    
     def generator():
-        cap = cv2.VideoCapture(rtsp)
-        if not cap.isOpened():
-            yield b''
-            return
+        stream = RTSPVideoStream(rtsp_url)
+        stream.start()
         try:
             while True:
-                ret, frame = cap.read()
-                if not ret:
-                    time.sleep(0.1)
+                # Use a small timeout to allow checking for disconnects/interrupts
+                frame = stream.read(timeout=0.5)
+                if frame is None:
+                    # If stream is still trying to connect, we might yield nothing or wait
+                    if not stream.is_alive():
+                        break
                     continue
+                
                 ok, buf = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
                 if not ok:
                     continue
+                    
                 frame_bytes = buf.tobytes()
                 yield (b'--frame\r\n'
                        b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
         finally:
-            cap.release()
+            stream.stop()
+
     return Response(generator(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
 
@@ -211,6 +279,92 @@ def upload_model():
 def index():
     static_dir = os.path.join(os.path.dirname(__file__), 'static')
     return send_from_directory(static_dir, 'index.html')
+
+@app.route('/ui/<path:filename>')
+def ui_pages(filename):
+    static_dir = os.path.join(os.path.dirname(__file__), 'static')
+    if not filename.endswith('.html'):
+        filename += '.html'
+    return send_from_directory(static_dir, filename)
+
+# Tracker configuration endpoints
+@app.route('/trackers', methods=['GET'])
+def list_trackers():
+    trackers = []
+    try:
+        for filename in os.listdir(TRACKERS_DIR):
+            if filename.endswith('.yml') or filename.endswith('.yaml'):
+                filepath = os.path.join(TRACKERS_DIR, filename)
+                with open(filepath, 'r') as f:
+                    config = yaml.safe_load(f)
+                trackers.append({
+                    'name': filename.rsplit('.', 1)[0],
+                    'filename': filename,
+                    'config': config
+                })
+    except Exception as e:
+        print(f"Error loading trackers: {e}")
+        return jsonify({'error': 'Failed to load trackers'}), 500
+    
+    return jsonify(trackers)
+
+@app.route('/trackers', methods=['POST'])
+def save_tracker():
+    data = request.json or {}
+    name = data.get('name')
+    config = data.get('config')
+    
+    if not name or not config:
+        return jsonify({'error': 'name and config fields required'}), 400
+    
+    # Validate tracker type
+    tracker_type = config.get('tracker_type')
+    if tracker_type not in ['botsort', 'bytetrack']:
+        return jsonify({'error': 'tracker_type must be botsort or bytetrack'}), 400
+    
+    # Sanitize filename
+    safe_name = "".join(c for c in name if c.isalnum() or c in (' ', '-', '_')).rstrip()
+    safe_name = safe_name.replace(' ', '_')
+    
+    if not safe_name:
+        return jsonify({'error': 'invalid tracker name'}), 400
+    
+    filename = f"{safe_name}.yml"
+    filepath = os.path.join(TRACKERS_DIR, filename)
+    
+    # Check if file already exists
+    if os.path.exists(filepath):
+        return jsonify({'error': 'tracker with this name already exists'}), 409
+    
+    try:
+        with open(filepath, 'w') as f:
+            yaml.dump(config, f, default_flow_style=False)
+        return jsonify({'message': 'tracker saved', 'name': safe_name}), 201
+    except Exception as e:
+        print(f"Error saving tracker: {e}")
+        return jsonify({'error': 'Failed to save tracker'}), 500
+
+@app.route('/trackers/<name>', methods=['DELETE'])
+def delete_tracker(name):
+    # Sanitize input
+    safe_name = "".join(c for c in name if c.isalnum() or c in (' ', '-', '_')).rstrip()
+    safe_name = safe_name.replace(' ', '_')
+    
+    if not safe_name:
+        return jsonify({'error': 'invalid tracker name'}), 400
+    
+    filename = f"{safe_name}.yml"
+    filepath = os.path.join(TRACKERS_DIR, filename)
+    
+    if not os.path.exists(filepath):
+        return jsonify({'error': 'tracker not found'}), 404
+    
+    try:
+        os.remove(filepath)
+        return jsonify({'message': 'tracker deleted', 'name': safe_name})
+    except Exception as e:
+        print(f"Error deleting tracker: {e}")
+        return jsonify({'error': 'Failed to delete tracker'}), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)

@@ -89,13 +89,7 @@ class RTSPVideoStream(threading.Thread):
     def _disconnect(self):
         self.is_connected = False
         with self._lock:
-            # Optionally clear latest_frame to indicate signal loss
-            # self.latest_frame = None 
-            # Keeping the last frame might be preferred for some UIs, 
-            # but for logic "No frame received" implies we should probably clear it 
-            # or rely on the fact that it won't change.
-            # worker.py checks for NEW frames via timeout usually, but here read() returns latest.
-            # Let's keep the last frame to avoid flashing black, but worker.py might process it again.
+
             pass
             
         if self._cap:
