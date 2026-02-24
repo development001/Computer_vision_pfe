@@ -20,7 +20,7 @@ MODELS_DIR = os.path.join(os.path.dirname(__file__), 'models')
 if not os.path.exists(MODELS_DIR):
     os.makedirs(MODELS_DIR)
 
-ALLOWED_EXTENSIONS = {'pt', 'onnx'}
+ALLOWED_EXTENSIONS = {'pt', 'onnx', 'engine'}
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -274,18 +274,52 @@ def upload_model():
     filepath = os.path.join(MODELS_DIR, filename)
     file.save(filepath)
     return jsonify({'message': 'model uploaded', 'filename': filename}), 201
+ 
+@app.route('/models/optimize', methods=['POST'])
+def optimize_model():
+    data = request.json or {}
+    source = data.get('source')
+    target = (data.get('target') or '').lower()
+    imgsz = data.get('imgsz', 640)
+    opset = int(data.get('opset', 12))
+    dynamic = bool(data.get('dynamic', False))
+    half = bool(data.get('half', False))
+
+    if not source:
+        return jsonify({'error': 'source field required'}), 400
+    if target not in ('onnx', 'tensorrt'):
+        return jsonify({'error': 'target must be \"onnx\" or \"tensorrt\"'}), 400
+
+    try:
+        from services.model_optimizer import ModelOptimizer
+    except Exception as e:
+        return jsonify({'error': f'optimizer unavailable: {e}'}), 500
+    try:
+        optimizer = ModelOptimizer(MODELS_DIR)
+        out_name = optimizer.optimize(source, target, imgsz=imgsz, opset=opset, dynamic=dynamic, half=half)
+        return jsonify({'message': 'model optimized', 'filename': out_name, 'format': target}), 200
+    except Exception as e:
+        return jsonify({'error': f'optimization failed: {e}'}), 500
 
 @app.route('/')
 def index():
     static_dir = os.path.join(os.path.dirname(__file__), 'static')
     return send_from_directory(static_dir, 'index.html')
 
-@app.route('/ui/<path:filename>')
-def ui_pages(filename):
+@app.route('/ui/<path:name>')
+def ui_pages(name):
     static_dir = os.path.join(os.path.dirname(__file__), 'static')
-    if not filename.endswith('.html'):
-        filename += '.html'
-    return send_from_directory(static_dir, filename)
+    base = name[:-5] if name.endswith('.html') else name
+    nested = os.path.join(base, f"{os.path.basename(base)}.html")
+    nested_path = os.path.join(static_dir, nested)
+    if os.path.exists(nested_path):
+        subdir = os.path.join(static_dir, base)
+        return send_from_directory(subdir, f"{os.path.basename(base)}.html")
+    candidate = name if name.endswith('.html') else f"{name}.html"
+    root_path = os.path.join(static_dir, candidate)
+    if os.path.exists(root_path):
+        return send_from_directory(static_dir, candidate)
+    return jsonify({'error': 'page not found'}), 404
 
 # Tracker configuration endpoints
 @app.route('/trackers', methods=['GET'])

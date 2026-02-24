@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Models - YOLO AI Server</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/models/models.css">
+</head>
+<body>
+
+<div class="app-layout">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="brand">
+      <span>YOLO</span> AI Server
+    </div>
+    <nav class="nav-links">
+      <a href="/ui/cameras" class="nav-item">
+        <span class="nav-icon">📷</span> <span class="nav-text">Cameras</span>
+      </a>
+      <a href="/ui/models" class="nav-item active">
+        <span class="nav-icon">🧠</span> <span class="nav-text">Models</span>
+      </a>
+      <a href="/ui/jobs" class="nav-item">
+        <span class="nav-icon">⚙️</span> <span class="nav-text">Jobs</span>
+      </a>
+      <a href="/ui/trackers" class="nav-item">
+        <span class="nav-icon">🎯</span> <span class="nav-text">Trackers</span>
+      </a>
+    </nav>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="main-content">
+    <header>
+      <div class="page-title">
+        <h1>Model Management</h1>
+        <p>Upload and manage YOLO models for detection</p>
+      </div>
+    </header>
+
+    <div class="content-grid">
+      <!-- Upload Card -->
+      <div class="card upload-card">
+        <h3>Upload New Model</h3>
+        <div class="upload-area">
+          <input type="file" id="model-file" accept=".pt,.onnx" hidden/>
+          <label for="model-file" class="upload-label">
+            <span class="icon">📁</span>
+            <span>Click to select .pt or .onnx file</span>
+          </label>
+          <div id="file-name" class="file-name"></div>
+          <button onclick="uploadModel()" class="btn btn-primary" style="margin-top:16px;">Upload Model</button>
+          <div id="upload-status" class="status-text"></div>
+        </div>
+      </div>
+
+      <!-- Models List -->
+      <div class="card list-card">
+        <h3>Available Models</h3>
+        <ul id="models-list" class="models-list">
+          <!-- Models will be populated here -->
+        </ul>
+      </div>
+      
+      <!-- Optimizer Card -->
+      <div class="card">
+        <h3>Optimize Model</h3>
+        <div class="form-group">
+          <label>Select Source Model</label>
+          <select id="opt-source-select">
+            <option value="" disabled selected>Loading models...</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Target Format</label>
+          <select id="opt-target-select">
+            <option value="onnx">ONNX</option>
+            <option value="tensorrt">TensorRT (engine)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Image Size</label>
+          <input type="number" id="opt-imgsz" value="640" min="64" step="64">
+        </div>
+        <div class="form-group">
+          <label class="checkbox-label" style="display:flex; align-items:center; gap:8px;">
+            <input type="checkbox" id="opt-dynamic" style="width:auto;">
+            <span>Dynamic shapes (ONNX)</span>
+          </label>
+        </div>
+        <div class="form-group">
+          <label class="checkbox-label" style="display:flex; align-items:center; gap:8px;">
+            <input type="checkbox" id="opt-half" style="width:auto;">
+            <span>FP16 (TensorRT)</span>
+          </label>
+        </div>
+        <button onclick="optimizeModel()" class="btn btn-primary">Optimize</button>
+        <div id="opt-status" class="status-text"></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="/static/models/models.js"></script>
+</body>
+</html>

@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tracker Configuration</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/trackers/trackers.css">
+</head>
+<body>
+
+<div class="app-layout">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="brand">
+      <span>YOLO</span> AI Server
+    </div>
+    <nav class="nav-links">
+      <a href="/ui/cameras" class="nav-item">
+        <span class="nav-icon">📷</span> <span class="nav-text">Cameras</span>
+      </a>
+      <a href="/ui/models" class="nav-item">
+        <span class="nav-icon">🧠</span> <span class="nav-text">Models</span>
+      </a>
+      <a href="/ui/jobs" class="nav-item">
+        <span class="nav-icon">⚙️</span> <span class="nav-text">Jobs</span>
+      </a>
+      <a href="/ui/trackers" class="nav-item active">
+        <span class="nav-icon">🎯</span> <span class="nav-text">Trackers</span>
+      </a>
+    </nav>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="main-content">
+    <header>
+        <div class="page-title">
+            <h1>Tracker Configuration</h1>
+            <p>Create and manage object tracking configurations</p>
+        </div>
+    </header>
+
+    <div class="content-grid">
+        <div class="card">
+            <h2>Create New Tracker Configuration</h2>
+            
+            <form id="trackerForm" class="tracker-form">
+                <div class="form-group">
+                    <label for="trackerName">Tracker Name</label>
+                    <input type="text" id="trackerName" required placeholder="Enter a unique name for this tracker">
+                </div>
+
+                <div class="form-group">
+                    <label for="trackerType">Tracker Type</label>
+                    <select id="trackerType" required onchange="toggleTrackerOptions()">
+                        <option value="">Select Tracker Type</option>
+                        <option value="botsort">BoTSORT</option>
+                        <option value="bytetrack">ByteTrack</option>
+                    </select>
+                </div>
+
+                <!-- Common Tracker Parameters -->
+                <div class="form-section">
+                    <h3>Common Parameters</h3>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="trackBuffer">Track Buffer</label>
+                            <input type="number" id="trackBuffer" value="30" step="10" min="10" max="100">
+                            <span class="help-text">Number of frames to keep in track buffer</span>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="trackHighThresh">Track High Threshold</label>
+                            <input type="number" id="trackHighThresh" value="0.5" step="0.05" min="0" max="1">
+                            <span class="help-text">High confidence threshold for tracking</span>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="trackLowThresh">Track Low Threshold</label>
+                            <input type="number" id="trackLowThresh" value="0.1" step="0.05" min="0" max="1">
+                            <span class="help-text">Low confidence threshold for tracking</span>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="newTrackThresh">New Track Threshold</label>
+                            <input type="number" id="newTrackThresh" value="0.6" step="0.05" min="0" max="1">
+                            <span class="help-text">Threshold for initializing new tracks</span>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="matchThresh">Match Threshold</label>
+                            <input type="number" id="matchThresh" value="0.8" step="0.05" min="0" max="1">
+                            <span class="help-text">Threshold for matching detections to tracks</span>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="fuseScore" class="checkbox-label" style="display:flex; align-items:center; gap:8px;">
+                                <input type="checkbox" id="fuseScore" checked style="width:auto;"> Fuse Score
+                            </label>
+                            <span class="help-text">Fuse detection and appearance scores</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- BoTSORT Specific Parameters -->
+                <div id="botsortOptions" class="form-section botsort-options" style="display: none;">
+                    <h3>BoTSORT Specific Parameters</h3>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="gmcMethod">GMC Method</label>
+                            <select id="gmcMethod">
+                                <option value="sparseOptFlow">Sparse Optical Flow</option>
+                                <option value="none">None</option>
+                            </select>
+                            <span class="help-text">Global Motion Compensation method</span>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="proximityThresh">Proximity Threshold</label>
+                            <input type="number" id="proximityThresh" value="0.5" step="0.05" min="0" max="1">
+                            <span class="help-text">Threshold for proximity-based matching</span>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="appearanceThresh">Appearance Threshold</label>
+                            <input type="number" id="appearanceThresh" value="0.25" step="0.05" min="0" max="1">
+                            <span class="help-text">Threshold for appearance-based matching</span>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="withReid" class="checkbox-label" style="display:flex; align-items:center; gap:8px;">
+                                <input type="checkbox" id="withReid" checked style="width:auto;"> With ReID
+                            </label>
+                            <span class="help-text">Whether to use Re-identification</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Save Tracker Configuration</button>
+                    <button type="button" class="btn btn-secondary" onclick="clearForm()">Clear Form</button>
+                </div>
+            </form>
+        </div>
+
+        <div class="card">
+            <h2>Saved Tracker Configurations</h2>
+            <div id="savedTrackers" class="saved-trackers">
+                <p>Loading saved tracker configurations...</p>
+            </div>
+        </div>
+    </div>
+  </main>
+</div>
+
+<script src="/static/trackers/trackers.js"></script>
+</body>
+</html>

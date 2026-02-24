@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Jobs - YOLO AI Server</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/jobs/jobs.css">
+</head>
+<body>
+
+<div class="app-layout">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="brand">
+      <span>YOLO</span> AI Server
+    </div>
+    <nav class="nav-links">
+      <a href="/ui/cameras" class="nav-item">
+        <span class="nav-icon">📷</span> <span class="nav-text">Cameras</span>
+      </a>
+      <a href="/ui/models" class="nav-item">
+        <span class="nav-icon">🧠</span> <span class="nav-text">Models</span>
+      </a>
+      <a href="/ui/jobs" class="nav-item active">
+        <span class="nav-icon">⚙️</span> <span class="nav-text">Jobs</span>
+      </a>
+      <a href="/ui/trackers" class="nav-item">
+        <span class="nav-icon">🎯</span> <span class="nav-text">Trackers</span>
+      </a>
+    </nav>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="main-content">
+    <header>
+      <div class="page-title">
+        <h1>Active Jobs</h1>
+        <p>Monitor and manage object detection tasks</p>
+      </div>
+    </header>
+
+    <div class="content-grid">
+      <div class="card job-form-card">
+        <h3>Start New Job</h3>
+        
+        <div class="form-group">
+          <label>Select Camera</label>
+          <select id="camera-select">
+            <option value="" disabled selected>Loading cameras...</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Select Model</label>
+          <select id="model-select">
+            <option value="" disabled selected>Loading models...</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Tracker Configuration</label>
+          <select id="tracker-select">
+            <option value="bytetrack.yaml" selected>ByteTrack (Default)</option>
+            <option value="botsort.yaml">BoTSORT (Default)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Inference Settings</label>
+          <div class="row">
+            <div class="col">
+              <label>Confidence</label>
+              <input type="number" id="conf" value="0.25" step="0.01">
+            </div>
+            <div class="col">
+              <label>IOU</label>
+              <input type="number" id="iou" value="0.7" step="0.01">
+            </div>
+          </div>
+        </div>
+
+        <div class="collapsible-section">
+          <details>
+            <summary>Advanced Configuration</summary>
+            <div class="advanced-options">
+              <div class="config-group">
+                <h4>Line Counting</h4>
+                <label class="checkbox-label" style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+                  <input type="checkbox" id="line-counting-check" style="width:auto;">
+                  <span>Enable Counting Line</span>
+                </label>
+                <div id="line-coords-display" style="display:none; font-size:0.9em; color:var(--text-secondary);">
+                  <span>Line Coordinates:</span> <span id="coords-values">Not set</span>
+                </div>
+              </div>
+              
+              <div class="config-group">
+                <h4>RTSP Settings</h4>
+                <div class="row" style="margin-bottom:10px;">
+                  <div class="col">
+                    <label>Width</label>
+                    <input type="number" id="rtsp_width" value="640">
+                  </div>
+                  <div class="col">
+                    <label>Height</label>
+                    <input type="number" id="rtsp_height" value="640">
+                  </div>
+                </div>
+                
+                <div class="row" style="margin-bottom:10px;">
+                  <div class="col">
+                    <label>FPS</label>
+                    <input type="number" id="rtsp_fps" value="15">
+                  </div>
+                  <div class="col">
+                    <label>Buffer Size</label>
+                    <input type="number" id="rtsp_buffer_size" value="1">
+                  </div>
+                </div>
+
+                <div class="row" style="margin-bottom:10px;">
+                  <div class="col">
+                    <label>Reconnect Delay (s)</label>
+                    <input type="number" id="rtsp_reconnect_delay" value="3.0" step="0.5">
+                  </div>
+                  <div class="col">
+                    <label>Read Timeout (s)</label>
+                    <input type="number" id="rtsp_read_timeout" value="5.0" step="0.5">
+                  </div>
+                </div>
+
+                <label>OpenCV Backend</label>
+                <select id="rtsp_cv2_backend">
+                  <option value="">Default</option>
+                  <option value="FFMPEG">FFMPEG</option>
+                  <option value="GSTREAMER">GStreamer</option>
+                </select>
+              </div>
+            </div>
+          </details>
+        </div>
+
+        <button onclick="startJob()" class="btn btn-primary" style="width:100%; margin-top:20px;">Start Detection Job</button>
+      </div>
+
+      <div class="card jobs-list-card">
+        <h3>Running Jobs</h3>
+        <div id="jobs-list" class="jobs-list">
+          <!-- Jobs will be populated here -->
+        </div>
+      </div>
+    </div>
+
+    <div class="live-view-section" id="live-view-section" style="display:none;">
+      <h3>Job Live View</h3>
+      <div class="viewer-container">
+        <img id="stream" src="" alt="Select a job to view" />
+        <button class="close-btn" onclick="closeViewer()">×</button>
+      </div>
+    </div>
+
+    <div id="line-modal" class="modal" style="display:none;">
+      <div class="modal-content">
+        <h3>Draw Counting Line</h3>
+        <p>Click and drag to draw a line. Objects crossing this line will be counted.</p>
+        <div class="canvas-container" style="position: relative; margin: 20px 0;">
+          <canvas id="line-canvas"></canvas>
+        </div>
+        <div class="modal-actions">
+          <button id="confirm-line" class="btn btn-primary">Confirm Line</button>
+          <button id="cancel-line" class="btn btn-secondary">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="/static/jobs/jobs.js"></script>
+</body>
+</html>
