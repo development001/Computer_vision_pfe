@@ -4,12 +4,12 @@ import cv2
 import numpy as np
 
 class RTSPVideoStream(threading.Thread):
-    def __init__(self, rtsp_url, width=None, height=None, fps=15, reconnect_delay=3.0,
+    def __init__(self, rtsp_url, width, height, fps=15, reconnect_delay=3.0, 
                  buffer_size=1, read_timeout=5.0, cv2_backend=None):
         super().__init__(daemon=True)
         self.rtsp_url = rtsp_url
-        self.width = int(width) if width is not None else None
-        self.height = int(height) if height is not None else None
+        self.width = int(width)
+        self.height = int(height)
         self.fps = int(fps)
         self.reconnect_delay = reconnect_delay
         self.buffer_size = int(buffer_size)
@@ -41,13 +41,8 @@ class RTSPVideoStream(threading.Thread):
                     time.sleep(self.reconnect_delay)
                     continue
 
-                # Only resize when both dimensions are explicitly provided.
-                # If width/height are omitted, keep camera native/default resolution.
-                if (
-                    self.width is not None and
-                    self.height is not None and
-                    (frame.shape[0] != self.height or frame.shape[1] != self.width)
-                ):
+                # Resize if needed to match requested dimensions
+                if frame.shape[0] != self.height or frame.shape[1] != self.width:
                     frame = cv2.resize(frame, (self.width, self.height))
 
                 with self._lock:
