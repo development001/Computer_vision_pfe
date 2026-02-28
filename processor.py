@@ -2,6 +2,8 @@ import os
 import cv2
 import numpy as np
 from ultralytics import YOLO
+from utils.detected_object import DetectedObject
+from datetime import datetime
 
 class VideoProcessor:
     def __init__(self, config):
@@ -14,7 +16,8 @@ class VideoProcessor:
         }
         self.seen_ids = set()
         self.track_history = {} # track_id -> (cx, cy)
-        
+        self.detected_events = []  # list of DetectedObject instances
+
         self._init_model()
 
     def _init_model(self):
@@ -23,6 +26,15 @@ class VideoProcessor:
             self.model = YOLO(model_path)
         except Exception as e:
             raise RuntimeError(f"Failed to load model: {e}")
+            
+    def close(self):
+        """Clean up resources."""
+        # Ultralytics models don't strictly require a close method,
+        # but this provides a hook for any cleanup we might need later
+        # (e.g. if we were using a different inference engine).
+        self.model = None
+        self.track_history.clear()
+        self.seen_ids.clear()
 
     def process_frame(self, frame):
         """
@@ -52,8 +64,9 @@ class VideoProcessor:
                 cv2.putText(annotated_frame, "B", (x2, y2), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1)
 
             for result in results:
-                self._update_stats(result)
+                # Plot/annotate first, then pass annotated frame so events include overlays
                 annotated_frame = result.plot()
+                self._update_stats(result, annotated_frame)
                 self._draw_stats(annotated_frame)
                 break # Process only the first result (usually only one per frame)
             
@@ -61,8 +74,9 @@ class VideoProcessor:
 
         except Exception as e:
             print(f"Error: Frame processing error: {e}")
+            return frame
 
-    def _update_stats(self, result):
+    def _update_stats(self, result, frame):
         boxes = getattr(result, "boxes", None)
         if boxes is None or not hasattr(boxes, "id") or boxes.id is None:
             return
@@ -70,6 +84,7 @@ class VideoProcessor:
         ids = boxes.id.cpu().numpy().astype(int).tolist()
         cls_idxs = boxes.cls.cpu().numpy().astype(int).tolist() if hasattr(boxes, "cls") else []
         xywhs = boxes.xywh.cpu().numpy().tolist() if hasattr(boxes, "xywh") else []
+        confs = boxes.conf.cpu().numpy().tolist() if hasattr(boxes, "conf") else []
 
         for i, (tid, cid) in enumerate(zip(ids, cls_idxs)):
             cname = self.model.names.get(cid, str(cid))
@@ -89,12 +104,13 @@ class VideoProcessor:
             # Line crossing counting
             if self.config.line_coords and i < len(xywhs):
                 cx, cy = int(xywhs[i][0]), int(xywhs[i][1])
+                w, h = int(xywhs[i][2]), int(xywhs[i][3])
                 curr_point = (cx, cy)
-                
+
                 if tid in self.track_history:
                     prev_point = self.track_history[tid]
                     direction = self._check_crossing(prev_point, curr_point, self.config.line_coords)
-                    
+
                     if direction:
                         # Init if not exists (redundant but safe)
                         if cname not in self.stats['line_counts']:
@@ -102,13 +118,45 @@ class VideoProcessor:
                              
                         self.stats['line_counts'][cname][direction] += 1
                         print(f"Info: Object crossed line ({direction}): ID {tid} ({cname})")
-                
+
+                        # Create DetectedObject event and store it
+                        try:
+                            # Convert xywh center to top-left x,y and ensure ints
+                            x = int(cx - w/2)
+                            y = int(cy - h/2)
+                            x = max(0, x)
+                            y = max(0, y)
+                           
+
+                            # Crop image safely
+
+                            conf = confs[i] if i < len(confs) else 0.0
+
+                            dobj = DetectedObject(
+                                class_name=cname,
+                                object_id=tid,
+                                detection_time=datetime.now(),
+                                location=[x, y, int(w), int(h)],
+                                image= frame.copy(),
+                                inOrOut=direction,
+                                confidence=float(conf)
+                            )
+
+                            self.detected_events.append(dobj)
+                        except Exception as e:
+                            print(f"Warning: Failed creating DetectedObject: {e}")
+
                 self.track_history[tid] = curr_point
 
     def _check_crossing(self, p1, p2, line_coords):
         """
         Check if movement from p1 to p2 crosses the line.
         Returns 'in' or 'out' if crossed, None otherwise.
+        
+        Direction Convention:
+        - The line is defined from Start (A) to End (B).
+        - "In": Crossing from the Right side to the Left side (relative to A->B).
+        - "Out": Crossing from the Left side to the Right side (relative to A->B).
         """
         x1, y1, x2, y2 = line_coords
         l1, l2 = (x1, y1), (x2, y2)
@@ -117,25 +165,11 @@ class VideoProcessor:
         def ccw(A, B, C):
             return (C[1]-A[1]) * (B[0]-A[0]) > (B[1]-A[1]) * (C[0]-A[0])
             
-        # Standard intersection check
-        # A line segment P1-P2 intersects L1-L2 if P1 and P2 are on opposite sides of L1-L2
-        # AND L1 and L2 are on opposite sides of P1-P2.
-        
-        # But wait, my previous logic in the SearchReplace block had a potential issue:
-        # ccw(p1, l1, l2) != ccw(p2, l1, l2) checks if p1 and p2 are on opposite sides of l1-l2
-        # ccw(p1, p2, l1) != ccw(p1, p2, l2) checks if l1 and l2 are on opposite sides of p1-p2
-        
-        # This is correct for general segment intersection.
-        
         intersect = ccw(p1, l1, l2) != ccw(p2, l1, l2) and ccw(p1, p2, l1) != ccw(p1, p2, l2)
         
         if intersect:
             # Determine direction using position of p1 relative to the line.
             # Value = (x2 - x1)(y - y1) - (y2 - y1)(x - x1)
-            # A->B vector is (x2-x1, y2-y1)
-            # P1->P vector is (x-x1, y-y1)
-            # Cross product (A->B) x (A->P)
-            
             val1 = (x2 - x1)*(p1[1] - y1) - (y2 - y1)*(p1[0] - x1)
             
             # Arbitrary convention: Positive val1 means "In", Negative means "Out"

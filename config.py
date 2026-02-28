@@ -3,8 +3,8 @@ from typing import Optional, Dict, Any, List
 
 @dataclass
 class RTSPConfig:
-    width: int = 640
-    height: int = 640
+    width: Optional[int] = None
+    height: Optional[int] = None
     fps: int = 15
     reconnect_delay: float = 3.0
     buffer_size: int = 1
@@ -13,9 +13,14 @@ class RTSPConfig:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'RTSPConfig':
+        def _optional_int(value):
+            if value is None or value == '':
+                return None
+            return int(value)
+
         return cls(
-            width=int(data.get('rtsp_width', 640)),
-            height=int(data.get('rtsp_height', 640)),
+            width=_optional_int(data.get('rtsp_width')),
+            height=_optional_int(data.get('rtsp_height')),
             fps=int(data.get('rtsp_fps', 15)),
             reconnect_delay=float(data.get('rtsp_reconnect_delay', 3.0)),
             buffer_size=int(data.get('rtsp_buffer_size', 1)),

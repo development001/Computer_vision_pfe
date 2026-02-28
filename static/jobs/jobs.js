@@ -323,8 +323,10 @@ async function startJob(){
   const iou = parseFloat(document.getElementById('iou').value) || 0.7;
   
   const tracker_file = document.getElementById('tracker-select').value;
-  const rtsp_width = parseInt(document.getElementById('rtsp_width').value) || 640;
-  const rtsp_height = parseInt(document.getElementById('rtsp_height').value) || 640;
+  const rawRtspWidth = document.getElementById('rtsp_width').value.trim();
+  const rawRtspHeight = document.getElementById('rtsp_height').value.trim();
+  const rtsp_width = rawRtspWidth ? parseInt(rawRtspWidth) : null;
+  const rtsp_height = rawRtspHeight ? parseInt(rawRtspHeight) : null;
   const rtsp_fps = parseInt(document.getElementById('rtsp_fps').value) || 15;
   const rtsp_buffer_size = parseInt(document.getElementById('rtsp_buffer_size').value) || 1;
   const rtsp_reconnect_delay = parseFloat(document.getElementById('rtsp_reconnect_delay').value) || 3.0;
