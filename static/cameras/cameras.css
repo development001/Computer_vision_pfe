@@ -8,6 +8,14 @@
   .content-grid {
     grid-template-columns: 1fr;
   }
+  .record-settings-grid,
+  .raw-settings-row {
+    grid-template-columns: 1fr;
+  }
+  .record-settings-actions {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }
 
 .add-camera-card {
@@ -51,6 +59,87 @@
   gap: 15px;
 }
 
+.raw-settings {
+  margin-bottom: 14px;
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.raw-settings-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #475569;
+  margin-bottom: 8px;
+}
+
+.raw-settings-row {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr 1fr;
+  gap: 8px;
+}
+
+.raw-settings-row select,
+.raw-settings-row input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 0.92rem;
+  background: #fff;
+}
+
+.raw-settings-row input:disabled {
+  background: #f1f5f9;
+  color: #94a3b8;
+}
+
+.record-settings {
+  margin-bottom: 14px;
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.record-settings-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.record-settings-grid input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 0.92rem;
+  background: #fff;
+}
+
+.record-settings-actions {
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.record-settings-hint {
+  color: #64748b;
+  font-size: 0.82rem;
+}
+
+.record-status {
+  margin-top: 8px;
+  font-size: 0.85rem;
+  color: #475569;
+}
+
+.record-status.error {
+  color: #dc2626;
+}
+
 .camera-item {
   display: flex;
   align-items: center;
@@ -84,6 +173,18 @@
   color: #2d3748;
 }
 
+.recording-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 6px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #fff;
+  background: #dc2626;
+  border-radius: 999px;
+  vertical-align: middle;
+}
+
 .camera-rtsp {
   font-size: 0.85rem;
   color: #718096;
@@ -107,6 +208,14 @@
 
 .action-btn.secondary {
   background: #a0aec0;
+}
+
+.action-btn.record {
+  background: #0ea5e9;
+}
+
+.action-btn.recording {
+  background: #dc2626;
 }
 
 .action-btn:hover {

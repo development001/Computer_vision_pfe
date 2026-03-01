@@ -1,125 +1,36 @@
-.training-grid {
+.workflow-grid {
   display: grid;
-  grid-template-columns: 320px 1fr;
+  grid-template-columns: repeat(2, minmax(260px, 1fr));
   gap: 20px;
 }
 
-.form-row {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 10px;
-}
-
-.list-box {
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  min-height: 120px;
-  max-height: 320px;
-  overflow: auto;
-  padding: 8px;
-  background: #fff;
-}
-
-.list-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  padding: 8px 10px;
-  margin-bottom: 8px;
-}
-
-.list-item.active {
-  border-color: var(--primary);
-  background: #eff6ff;
-}
-
-.item-actions {
-  display: flex;
-  gap: 6px;
-}
-
-.tabs {
-  display: flex;
-  gap: 8px;
-  margin: 14px 0;
-  flex-wrap: wrap;
-}
-
-.tab-btn {
-  padding: 8px 12px;
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  background: #fff;
-  cursor: pointer;
-}
-
-.tab-btn.active {
-  background: var(--primary);
-  color: #fff;
-  border-color: var(--primary);
-}
-
-.tab-pane {
-  display: none;
-}
-
-.tab-pane.active {
+.workflow-card {
   display: block;
-}
-
-.annotator-toolbar {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 10px;
-  flex-wrap: wrap;
-}
-
-#annotator-canvas {
-  width: 100%;
-  max-width: 900px;
+  text-decoration: none;
+  color: inherit;
   border: 1px solid var(--border-color);
-  border-radius: 8px;
-  cursor: crosshair;
-  background: #0f172a;
+  border-radius: 12px;
+  padding: 22px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-.training-form-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(120px, 1fr));
-  gap: 10px;
+.workflow-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--primary);
+  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.08);
 }
 
-.status {
-  margin-top: 12px;
-  font-size: 14px;
-  color: var(--text-secondary);
-}
-
-.logs {
-  margin-top: 12px;
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  background: #0b1220;
-  color: #dbeafe;
-  min-height: 220px;
-  max-height: 340px;
-  overflow: auto;
-  padding: 12px;
-}
-
-.muted {
-  color: var(--text-secondary);
+.workflow-card h3 {
   margin-bottom: 8px;
 }
 
-@media (max-width: 1200px) {
-  .training-grid {
+.workflow-card p {
+  color: var(--text-secondary);
+}
+
+@media (max-width: 900px) {
+  .workflow-grid {
     grid-template-columns: 1fr;
   }
-  .training-form-grid {
-    grid-template-columns: repeat(2, minmax(120px, 1fr));
-  }
 }
-

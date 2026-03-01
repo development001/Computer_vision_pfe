@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Upload Data - YOLO AI Server</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/training/shared/training-common.css">
+<link rel="stylesheet" href="/static/training/upload/upload.css">
+</head>
+<body>
+<div class="app-layout">
+  <aside class="sidebar">
+    <div class="brand"><span>YOLO</span> AI Server</div>
+    <nav class="nav-links">
+      <a href="/ui/cameras" class="nav-item"><span class="nav-icon">CA</span><span class="nav-text">Cameras</span></a>
+      <a href="/ui/models" class="nav-item"><span class="nav-icon">MO</span><span class="nav-text">Models</span></a>
+      <a href="/ui/jobs" class="nav-item"><span class="nav-icon">JB</span><span class="nav-text">Jobs</span></a>
+      <a href="/ui/trackers" class="nav-item"><span class="nav-icon">TK</span><span class="nav-text">Trackers</span></a>
+      <a href="/ui/training" class="nav-item active"><span class="nav-icon">TR</span><span class="nav-text">Training</span></a>
+    </nav>
+  </aside>
+
+  <main class="main-content">
+    <header>
+      <div class="page-title">
+        <h1>Upload Data</h1>
+        <p>Create datasets and manage dataset images.</p>
+      </div>
+      <div class="page-actions">
+        <a href="/ui/training" class="btn btn-secondary">Training Menu</a>
+      </div>
+    </header>
+
+    <nav class="workflow-nav">
+      <a class="active" href="/ui/training/upload">Upload Data</a>
+      <a href="/ui/training/annotate">Annotate Data</a>
+      <a href="/ui/training/classes">Create Classes</a>
+      <a href="/ui/training/train">Train Data</a>
+    </nav>
+
+    <div class="grid">
+      <section class="card">
+        <h3>Create Dataset</h3>
+        <div class="form-row">
+          <input id="dataset-name" placeholder="Dataset name" />
+          <button id="create-dataset-btn" class="btn btn-primary">Create</button>
+        </div>
+        <textarea id="dataset-description" rows="2" placeholder="Dataset description (optional)"></textarea>
+      </section>
+
+      <section class="card">
+        <h3>Datasets</h3>
+        <div id="datasets-list" class="list-box"></div>
+      </section>
+
+      <section class="card card-wide">
+        <h3>Images</h3>
+        <div id="dataset-selected-info" class="muted">Select a dataset to manage images.</div>
+        <div class="form-row">
+          <input type="file" id="image-upload" multiple accept=".jpg,.jpeg,.png,.bmp,.webp" />
+          <button id="upload-images-btn" class="btn btn-primary">Upload</button>
+        </div>
+        <div id="images-list" class="list-box"></div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<script src="/static/training/shared/training-api.js"></script>
+<script src="/static/training/upload/upload.js"></script>
+</body>
+</html>

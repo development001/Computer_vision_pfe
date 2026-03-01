@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Annotate Data - YOLO AI Server</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/training/shared/training-common.css">
+<link rel="stylesheet" href="/static/training/annotate/annotate.css">
+</head>
+<body>
+<div class="app-layout">
+  <aside class="sidebar">
+    <div class="brand"><span>YOLO</span> AI Server</div>
+    <nav class="nav-links">
+      <a href="/ui/cameras" class="nav-item"><span class="nav-icon">CA</span><span class="nav-text">Cameras</span></a>
+      <a href="/ui/models" class="nav-item"><span class="nav-icon">MO</span><span class="nav-text">Models</span></a>
+      <a href="/ui/jobs" class="nav-item"><span class="nav-icon">JB</span><span class="nav-text">Jobs</span></a>
+      <a href="/ui/trackers" class="nav-item"><span class="nav-icon">TK</span><span class="nav-text">Trackers</span></a>
+      <a href="/ui/training" class="nav-item active"><span class="nav-icon">TR</span><span class="nav-text">Training</span></a>
+    </nav>
+  </aside>
+
+  <main class="main-content">
+    <header>
+      <div class="page-title">
+        <h1>Annotate Data</h1>
+        <p>Select dataset, pick annotation version, and draw labels.</p>
+      </div>
+      <div class="page-actions">
+        <a href="/ui/training" class="btn btn-secondary">Training Menu</a>
+      </div>
+    </header>
+
+    <nav class="workflow-nav">
+      <a href="/ui/training/upload">Upload Data</a>
+      <a class="active" href="/ui/training/annotate">Annotate Data</a>
+      <a href="/ui/training/classes">Create Classes</a>
+      <a href="/ui/training/train">Train Data</a>
+    </nav>
+
+    <section class="card flow-card">
+      <h3>Annotation Flow</h3>
+      <div class="flow-row">
+        <div class="form-group">
+          <label>Dataset</label>
+          <select id="dataset-select"></select>
+        </div>
+        <div class="form-group">
+          <label>Annotation Version</label>
+          <select id="version-select"></select>
+        </div>
+        <div class="flow-actions">
+          <button id="rename-version-btn" class="btn btn-secondary">Rename</button>
+          <button id="delete-version-btn" class="btn btn-secondary">Delete</button>
+        </div>
+      </div>
+      <div class="version-row">
+        <input id="version-name" placeholder="New version name (e.g. v2)" />
+        <select id="source-version"><option value="">Empty version</option></select>
+        <button id="create-version-btn" class="btn btn-primary">Create Version</button>
+      </div>
+      <div id="dataset-selected-info" class="muted">Select a dataset and version to start annotating.</div>
+    </section>
+
+    <div class="layout-grid">
+      <section class="card images-panel">
+        <h3>Dataset Images</h3>
+        <div class="annotator-toolbar">
+          <button id="annotator-prev-image" class="btn btn-secondary" title="Previous image">Prev</button>
+          <div id="annotator-image-name" class="image-name-pill">No image selected</div>
+          <button id="annotator-next-image" class="btn btn-secondary" title="Next image">Next</button>
+          <span id="annotator-image-position" class="position-pill">0 / 0</span>
+        </div>
+        <div class="gallery-toolbar">
+          <input id="image-search" placeholder="Search images..." />
+          <span id="image-count-label" class="muted"></span>
+        </div>
+        <div id="image-gallery" class="image-gallery"></div>
+      </section>
+
+      <section class="card">
+        <h3>Annotator</h3>
+        <div class="annotator-layout">
+          <aside class="annotator-side">
+            <h4>Tools</h4>
+            <label>Class</label>
+            <select id="annotator-class"></select>
+            <div class="annotator-actions">
+              <button id="delete-box-btn" class="btn btn-secondary">Delete Box</button>
+              <button id="save-annotations-btn" class="btn btn-primary">Save</button>
+            </div>
+            <p class="muted">Draw, move, resize, then save.</p>
+          </aside>
+          <div class="annotator-canvas-wrap">
+            <canvas id="annotator-canvas"></canvas>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<script src="/static/training/shared/training-api.js"></script>
+<script src="/static/training/annotate/annotate.js"></script>
+</body>
+</html>

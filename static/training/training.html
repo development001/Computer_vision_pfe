@@ -9,148 +9,45 @@
 <link rel="stylesheet" href="/static/training/training.css">
 </head>
 <body>
-
 <div class="app-layout">
   <aside class="sidebar">
-    <div class="brand">
-      <span>YOLO</span> AI Server
-    </div>
+    <div class="brand"><span>YOLO</span> AI Server</div>
     <nav class="nav-links">
-      <a href="/ui/cameras" class="nav-item">
-        <span class="nav-icon">CA</span> <span class="nav-text">Cameras</span>
-      </a>
-      <a href="/ui/models" class="nav-item">
-        <span class="nav-icon">MO</span> <span class="nav-text">Models</span>
-      </a>
-      <a href="/ui/jobs" class="nav-item">
-        <span class="nav-icon">JB</span> <span class="nav-text">Jobs</span>
-      </a>
-      <a href="/ui/trackers" class="nav-item">
-        <span class="nav-icon">TK</span> <span class="nav-text">Trackers</span>
-      </a>
-      <a href="/ui/training" class="nav-item active">
-        <span class="nav-icon">TR</span> <span class="nav-text">Training</span>
-      </a>
+      <a href="/ui/cameras" class="nav-item"><span class="nav-icon">CA</span><span class="nav-text">Cameras</span></a>
+      <a href="/ui/models" class="nav-item"><span class="nav-icon">MO</span><span class="nav-text">Models</span></a>
+      <a href="/ui/jobs" class="nav-item"><span class="nav-icon">JB</span><span class="nav-text">Jobs</span></a>
+      <a href="/ui/trackers" class="nav-item"><span class="nav-icon">TK</span><span class="nav-text">Trackers</span></a>
+      <a href="/ui/training" class="nav-item active"><span class="nav-icon">TR</span><span class="nav-text">Training</span></a>
     </nav>
   </aside>
 
   <main class="main-content">
     <header>
       <div class="page-title">
-        <h1>Training Management</h1>
-        <p>Create datasets, annotate images, and launch YOLO training jobs.</p>
+        <h1>Training Workspace</h1>
+        <p>Choose one workflow. Each step is isolated in its own page for cleaner maintenance.</p>
       </div>
     </header>
 
-    <div class="training-grid">
-      <section class="card datasets-panel">
-        <h3>Datasets</h3>
-        <div class="form-row">
-          <input id="dataset-name" placeholder="Dataset name" />
-          <button class="btn btn-primary" id="create-dataset-btn">Create</button>
-        </div>
-        <textarea id="dataset-description" rows="2" placeholder="Dataset description (optional)"></textarea>
-        <div id="datasets-list" class="list-box"></div>
-      </section>
-
-      <section class="card details-panel">
-        <h3>Dataset Details</h3>
-        <div id="dataset-selected-info" class="muted">Select a dataset to manage its data.</div>
-
-        <div class="tabs">
-          <button class="tab-btn active" data-tab="images">Images</button>
-          <button class="tab-btn" data-tab="classes">Classes</button>
-          <button class="tab-btn" data-tab="versions">Annotation Versions</button>
-          <button class="tab-btn" data-tab="annotator">Annotator</button>
-          <button class="tab-btn" data-tab="training">Training</button>
-        </div>
-
-        <div id="tab-images" class="tab-pane active">
-          <div class="form-row">
-            <input type="file" id="image-upload" multiple accept=".jpg,.jpeg,.png,.bmp,.webp" />
-            <button class="btn btn-primary" id="upload-images-btn">Upload</button>
-          </div>
-          <div id="images-list" class="list-box"></div>
-        </div>
-
-        <div id="tab-classes" class="tab-pane">
-          <div class="form-row">
-            <input id="class-name" placeholder="Class name" />
-            <input id="class-color" type="color" value="#ff0000" />
-            <button class="btn btn-primary" id="add-class-btn">Add Class</button>
-          </div>
-          <div id="classes-list" class="list-box"></div>
-        </div>
-
-        <div id="tab-versions" class="tab-pane">
-          <div class="form-row">
-            <input id="version-name" placeholder="Version name (e.g. v1)" />
-            <select id="source-version">
-              <option value="">Empty version</option>
-            </select>
-            <button class="btn btn-primary" id="create-version-btn">Create Version</button>
-          </div>
-          <div id="versions-list" class="list-box"></div>
-        </div>
-
-        <div id="tab-annotator" class="tab-pane">
-          <div class="annotator-toolbar">
-            <select id="annotator-image"></select>
-            <select id="annotator-class"></select>
-            <button class="btn btn-secondary" id="delete-box-btn">Delete Box</button>
-            <button class="btn btn-primary" id="save-annotations-btn">Save</button>
-          </div>
-          <p class="muted">Draw: drag on canvas. Edit: drag an existing box. Delete: select then click Delete Box.</p>
-          <canvas id="annotator-canvas"></canvas>
-        </div>
-
-        <div id="tab-training" class="tab-pane">
-          <div class="training-form-grid">
-            <div class="form-group">
-              <label>Annotation Version</label>
-              <select id="train-version"></select>
-            </div>
-            <div class="form-group">
-              <label>Model Source</label>
-              <select id="train-model"></select>
-            </div>
-            <div class="form-group">
-              <label>Epochs</label>
-              <input id="train-epochs" type="number" value="50" />
-            </div>
-            <div class="form-group">
-              <label>Batch Size</label>
-              <input id="train-batch" type="number" value="16" />
-            </div>
-            <div class="form-group">
-              <label>Image Size</label>
-              <input id="train-imgsz" type="number" value="640" />
-            </div>
-            <div class="form-group">
-              <label>Split Train</label>
-              <input id="split-train" type="number" step="0.01" value="0.8" />
-            </div>
-            <div class="form-group">
-              <label>Split Val</label>
-              <input id="split-val" type="number" step="0.01" value="0.1" />
-            </div>
-            <div class="form-group">
-              <label>Split Test</label>
-              <input id="split-test" type="number" step="0.01" value="0.1" />
-            </div>
-          </div>
-          <div class="form-row">
-            <button class="btn btn-primary" id="start-training-btn">Start Training</button>
-            <button class="btn btn-secondary" id="stop-training-btn">Stop Active</button>
-          </div>
-          <div id="training-status" class="status"></div>
-          <pre id="training-logs" class="logs"></pre>
-        </div>
-      </section>
-    </div>
+    <section class="workflow-grid">
+      <a class="workflow-card" href="/ui/training/upload">
+        <h3>Upload Data</h3>
+        <p>Create datasets and manage images.</p>
+      </a>
+      <a class="workflow-card" href="/ui/training/annotate">
+        <h3>Annotate Data</h3>
+        <p>Create versions and draw bounding boxes.</p>
+      </a>
+      <a class="workflow-card" href="/ui/training/classes">
+        <h3>Create Classes</h3>
+        <p>Add, edit, and remove class labels.</p>
+      </a>
+      <a class="workflow-card" href="/ui/training/train">
+        <h3>Train Data</h3>
+        <p>Run training jobs and monitor logs.</p>
+      </a>
+    </section>
   </main>
 </div>
-
-<script src="/static/training/training.js"></script>
 </body>
 </html>

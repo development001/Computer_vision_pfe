@@ -18,16 +18,16 @@
     </div>
     <nav class="nav-links">
       <a href="/ui/cameras" class="nav-item active">
-        <span class="nav-icon">📷</span> <span class="nav-text">Cameras</span>
+        <span class="nav-icon">CA</span> <span class="nav-text">Cameras</span>
       </a>
       <a href="/ui/models" class="nav-item">
-        <span class="nav-icon">🧠</span> <span class="nav-text">Models</span>
+        <span class="nav-icon">MO</span> <span class="nav-text">Models</span>
       </a>
       <a href="/ui/jobs" class="nav-item">
-        <span class="nav-icon">⚙️</span> <span class="nav-text">Jobs</span>
+        <span class="nav-icon">JB</span> <span class="nav-text">Jobs</span>
       </a>
       <a href="/ui/trackers" class="nav-item">
-        <span class="nav-icon">🎯</span> <span class="nav-text">Trackers</span>
+        <span class="nav-icon">TK</span> <span class="nav-text">Trackers</span>
       </a>
       <a href="/ui/training" class="nav-item">
         <span class="nav-icon">TR</span> <span class="nav-text">Training</span>
@@ -48,6 +48,28 @@
     <div class="content-grid">
       <div class="card list-card">
         <h3>Registered Cameras</h3>
+        <div class="raw-settings">
+          <div class="raw-settings-title">Raw Stream Resolution</div>
+          <div class="raw-settings-row">
+            <select id="raw-resolution-mode">
+              <option value="default" selected>Default (camera native)</option>
+              <option value="custom">Custom resolution</option>
+            </select>
+            <input id="raw-width" type="number" min="1" placeholder="Width" disabled />
+            <input id="raw-height" type="number" min="1" placeholder="Height" disabled />
+          </div>
+        </div>
+
+        <div class="record-settings">
+          <div class="raw-settings-title">Raw Recording</div>
+          <div class="record-settings-grid">
+            <input id="record-filename-prefix" placeholder="Filename prefix (optional)" />
+          </div>
+          <div class="record-settings-actions">
+            <span class="record-settings-hint">Saved automatically to server default recordings folder. Uses maximum practical stream FPS.</span>
+          </div>
+          <div id="record-status" class="record-status">Ready to record.</div>
+        </div>
         <div id="cameras-list" class="cameras-list">
           <!-- Cameras will be populated here -->
         </div>
@@ -92,5 +114,6 @@
 <script src="/static/cameras/cameras.js"></script>
 </body>
 </html>
+
 
 

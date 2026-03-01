@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Create Classes - YOLO AI Server</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/training/shared/training-common.css">
+<link rel="stylesheet" href="/static/training/classes/classes.css">
+</head>
+<body>
+<div class="app-layout">
+  <aside class="sidebar">
+    <div class="brand"><span>YOLO</span> AI Server</div>
+    <nav class="nav-links">
+      <a href="/ui/cameras" class="nav-item"><span class="nav-icon">CA</span><span class="nav-text">Cameras</span></a>
+      <a href="/ui/models" class="nav-item"><span class="nav-icon">MO</span><span class="nav-text">Models</span></a>
+      <a href="/ui/jobs" class="nav-item"><span class="nav-icon">JB</span><span class="nav-text">Jobs</span></a>
+      <a href="/ui/trackers" class="nav-item"><span class="nav-icon">TK</span><span class="nav-text">Trackers</span></a>
+      <a href="/ui/training" class="nav-item active"><span class="nav-icon">TR</span><span class="nav-text">Training</span></a>
+    </nav>
+  </aside>
+
+  <main class="main-content">
+    <header>
+      <div class="page-title">
+        <h1>Create Classes</h1>
+        <p>Create and manage class labels for a dataset.</p>
+      </div>
+      <div class="page-actions">
+        <a href="/ui/training" class="btn btn-secondary">Training Menu</a>
+      </div>
+    </header>
+
+    <nav class="workflow-nav">
+      <a href="/ui/training/upload">Upload Data</a>
+      <a href="/ui/training/annotate">Annotate Data</a>
+      <a class="active" href="/ui/training/classes">Create Classes</a>
+      <a href="/ui/training/train">Train Data</a>
+    </nav>
+
+    <div class="grid">
+      <section class="card">
+        <h3>Dataset</h3>
+        <select id="dataset-select"></select>
+        <div id="dataset-selected-info" class="muted"></div>
+      </section>
+
+      <section class="card">
+        <h3>Add Class</h3>
+        <div class="form-row">
+          <input id="class-name" placeholder="Class name" />
+          <input id="class-color" type="color" value="#ff0000" />
+          <button class="btn btn-primary" id="add-class-btn">Add</button>
+        </div>
+      </section>
+
+      <section class="card card-wide">
+        <h3>Class List</h3>
+        <div id="classes-list" class="list-box"></div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<script src="/static/training/shared/training-api.js"></script>
+<script src="/static/training/classes/classes.js"></script>
+</body>
+</html>

@@ -1,0 +1,45 @@
+.page-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.form-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.list-box {
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  min-height: 120px;
+  max-height: 420px;
+  overflow: auto;
+  padding: 8px;
+  background: #fff;
+}
+
+.list-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin-bottom: 8px;
+}
+
+.list-item.active {
+  border-color: var(--primary);
+  background: #eff6ff;
+}
+
+.item-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.muted {
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}

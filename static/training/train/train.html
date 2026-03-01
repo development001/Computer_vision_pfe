@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Train Data - YOLO AI Server</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/training/shared/training-common.css">
+<link rel="stylesheet" href="/static/training/train/train.css">
+</head>
+<body>
+<div class="app-layout">
+  <aside class="sidebar">
+    <div class="brand"><span>YOLO</span> AI Server</div>
+    <nav class="nav-links">
+      <a href="/ui/cameras" class="nav-item"><span class="nav-icon">CA</span><span class="nav-text">Cameras</span></a>
+      <a href="/ui/models" class="nav-item"><span class="nav-icon">MO</span><span class="nav-text">Models</span></a>
+      <a href="/ui/jobs" class="nav-item"><span class="nav-icon">JB</span><span class="nav-text">Jobs</span></a>
+      <a href="/ui/trackers" class="nav-item"><span class="nav-icon">TK</span><span class="nav-text">Trackers</span></a>
+      <a href="/ui/training" class="nav-item active"><span class="nav-icon">TR</span><span class="nav-text">Training</span></a>
+    </nav>
+  </aside>
+
+  <main class="main-content">
+    <header>
+      <div class="page-title">
+        <h1>Train Data</h1>
+        <p>Start and monitor YOLO training jobs.</p>
+      </div>
+      <div class="page-actions">
+        <a href="/ui/training" class="btn btn-secondary">Training Menu</a>
+      </div>
+    </header>
+
+    <nav class="workflow-nav">
+      <a href="/ui/training/upload">Upload Data</a>
+      <a href="/ui/training/annotate">Annotate Data</a>
+      <a href="/ui/training/classes">Create Classes</a>
+      <a class="active" href="/ui/training/train">Train Data</a>
+    </nav>
+
+    <section class="card">
+      <h3>Training Setup</h3>
+      <div class="train-grid">
+        <div class="form-group">
+          <label>Dataset</label>
+          <select id="train-dataset"></select>
+        </div>
+        <div class="form-group">
+          <label>Annotation Version</label>
+          <select id="train-version"></select>
+        </div>
+        <div class="form-group">
+          <label>Model Source</label>
+          <select id="train-model"></select>
+        </div>
+        <div class="form-group">
+          <label>Epochs</label>
+          <input id="train-epochs" type="number" value="50" />
+        </div>
+        <div class="form-group">
+          <label>Batch Size</label>
+          <input id="train-batch" type="number" value="16" />
+        </div>
+        <div class="form-group">
+          <label>Image Size</label>
+          <input id="train-imgsz" type="number" value="640" />
+        </div>
+        <div class="form-group">
+          <label>Split Train</label>
+          <input id="split-train" type="number" step="0.01" value="0.8" />
+        </div>
+        <div class="form-group">
+          <label>Split Val</label>
+          <input id="split-val" type="number" step="0.01" value="0.1" />
+        </div>
+        <div class="form-group">
+          <label>Split Test</label>
+          <input id="split-test" type="number" step="0.01" value="0.1" />
+        </div>
+      </div>
+
+      <div class="form-row">
+        <button id="start-training-btn" class="btn btn-primary">Start Training</button>
+        <button id="stop-training-btn" class="btn btn-secondary">Stop Active</button>
+      </div>
+
+      <div id="training-status" class="status">No training jobs yet.</div>
+      <pre id="training-logs" class="logs"></pre>
+    </section>
+  </main>
+</div>
+
+<script src="/static/training/shared/training-api.js"></script>
+<script src="/static/training/train/train.js"></script>
+</body>
+</html>
