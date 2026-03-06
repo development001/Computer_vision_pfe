@@ -194,6 +194,37 @@
   margin: 12px 0;
 }
 
+.autodistill-panel {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.autodistill-panel h4 {
+  margin: 0 0 2px;
+}
+
+.autodistill-panel input,
+.autodistill-panel select {
+  width: 100%;
+}
+
+.autodistill-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-primary);
+  margin-top: 2px;
+}
+
+.autodistill-checkbox input {
+  width: auto;
+}
+
 .annotator-canvas-wrap {
   border: 1px solid var(--border-color);
   border-radius: 10px;

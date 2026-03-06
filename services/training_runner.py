@@ -3,9 +3,11 @@ import re
 import subprocess
 import threading
 import uuid
+import shutil
 from datetime import datetime, timezone
 from typing import Dict, Optional
 
+import torch
 import yaml
 
 
@@ -47,6 +49,16 @@ class TrainingRunner:
         if not model_source:
             raise ValueError("model_source is required")
         if model_source in self.PRESET_MODELS:
+            # Prefer validated local copies when present.
+            candidates = [
+                os.path.join(self.models_dir, model_source),
+                os.path.abspath(model_source),
+            ]
+            for candidate in candidates:
+                if os.path.exists(candidate):
+                    self._validate_pt_checkpoint(candidate, preset=True)
+                    return candidate
+            # Allow Ultralytics to auto-download preset weights.
             return model_source
 
         model_name = os.path.basename(model_source)
@@ -55,7 +67,22 @@ class TrainingRunner:
         abs_path = os.path.join(self.models_dir, model_name)
         if not os.path.exists(abs_path):
             raise ValueError(f"model not found: {model_name}")
+        self._validate_pt_checkpoint(abs_path, preset=False)
         return abs_path
+
+    def _validate_pt_checkpoint(self, path: str, preset: bool) -> None:
+        try:
+            torch.load(path, map_location="cpu")
+        except Exception as exc:
+            if preset:
+                raise ValueError(
+                    f"preset model file is corrupted: {path}. "
+                    f"Delete it and retry to auto-redownload. Details: {exc}"
+                ) from exc
+            raise ValueError(
+                f"custom model file is corrupted: {path}. "
+                f"Re-export/re-upload a valid .pt checkpoint. Details: {exc}"
+            ) from exc
 
     def _validate_class_ids(self, classes):
         if not classes:
@@ -95,6 +122,10 @@ class TrainingRunner:
 
         names = self._validate_class_ids(material["classes"])
         splits = self.store.split_images(dataset_id, version_id, split_train, split_val, split_test, seed)
+        labeled_splits = self._filter_to_labeled_images(splits, material["labels_dir"])
+        total_labeled = sum(len(v) for v in labeled_splits.values())
+        if total_labeled <= 0:
+            raise ValueError("selected annotation version has no non-empty label files")
 
         with self._lock:
             active = self.store.get_active_job_id()
@@ -108,15 +139,19 @@ class TrainingRunner:
             job_dir = os.path.join(self.base_dir, "jobs", job_id)
             splits_dir = os.path.join(job_dir, "splits")
             runs_dir = os.path.join(job_dir, "runs")
+            prepared_dir = os.path.join(job_dir, "prepared_dataset")
             os.makedirs(splits_dir, exist_ok=True)
             os.makedirs(runs_dir, exist_ok=True)
+            os.makedirs(prepared_dir, exist_ok=True)
 
             train_txt = os.path.join(splits_dir, "train.txt")
             val_txt = os.path.join(splits_dir, "val.txt")
             test_txt = os.path.join(splits_dir, "test.txt")
-            self._write_list(train_txt, splits["train"])
-            self._write_list(val_txt, splits["val"])
-            self._write_list(test_txt, splits["test"])
+
+            staged_splits = self._stage_yolo_dataset(prepared_dir, labeled_splits, material["labels_dir"])
+            self._write_list(train_txt, staged_splits["train"])
+            self._write_list(val_txt, staged_splits["val"])
+            self._write_list(test_txt, staged_splits["test"])
 
             dataset_yaml_path = os.path.join(job_dir, "dataset.yaml")
             with open(dataset_yaml_path, "w", encoding="utf-8") as f:
@@ -172,6 +207,7 @@ class TrainingRunner:
                 "logs_path": logs_path,
                 "state_path": state_path,
                 "command": cmd,
+                "split_counts": {k: len(v) for k, v in staged_splits.items()},
                 "message": "",
             }
             self.store.create_job(job)
@@ -185,6 +221,50 @@ class TrainingRunner:
         with open(path, "w", encoding="utf-8") as f:
             for row in rows:
                 f.write(f"{row}\n")
+
+    def _filter_to_labeled_images(self, splits, labels_dir: str):
+        filtered = {"train": [], "val": [], "test": []}
+        for split_name in filtered.keys():
+            for image_path in splits.get(split_name, []):
+                image_id = os.path.splitext(os.path.basename(image_path))[0]
+                label_path = os.path.join(labels_dir, f"{image_id}.txt")
+                if not os.path.exists(label_path):
+                    continue
+                try:
+                    if os.path.getsize(label_path) <= 0:
+                        continue
+                except OSError:
+                    continue
+                filtered[split_name].append(image_path)
+        return filtered
+
+    def _stage_yolo_dataset(self, prepared_dir: str, splits, labels_dir: str):
+        out = {"train": [], "val": [], "test": []}
+        for split_name in out.keys():
+            img_dir = os.path.join(prepared_dir, "images", split_name)
+            lbl_dir = os.path.join(prepared_dir, "labels", split_name)
+            os.makedirs(img_dir, exist_ok=True)
+            os.makedirs(lbl_dir, exist_ok=True)
+
+            for src_image in splits.get(split_name, []):
+                image_name = os.path.basename(src_image)
+                image_id = os.path.splitext(image_name)[0]
+                src_label = os.path.join(labels_dir, f"{image_id}.txt")
+                if not os.path.exists(src_label):
+                    continue
+
+                dst_image = os.path.join(img_dir, image_name)
+                dst_label = os.path.join(lbl_dir, f"{image_id}.txt")
+
+                shutil.copy2(src_image, dst_image)
+                shutil.copy2(src_label, dst_label)
+                out[split_name].append(dst_image)
+        return out
+
+    def _append_job_log(self, logs_path: str, line: str) -> None:
+        os.makedirs(os.path.dirname(logs_path), exist_ok=True)
+        with open(logs_path, "a", encoding="utf-8", errors="replace") as logf:
+            logf.write(f"{line.rstrip()}\n")
 
     def _parse_progress(self, line: str, epoch_total: int) -> Optional[int]:
         # Ultralytics commonly logs "1/100" per epoch; parse that pattern.
@@ -212,16 +292,21 @@ class TrainingRunner:
             return
         stop_event = runtime["stop_event"]
         process = None
+        logs_path = str(job.get("logs_path") or "")
         try:
-            os.makedirs(os.path.dirname(job["logs_path"]), exist_ok=True)
-            with open(job["logs_path"], "a", encoding="utf-8") as logf:
+            self._append_job_log(logs_path, f"[{_utc_now()}] Starting training job {job_id}")
+            self._append_job_log(logs_path, f"[{_utc_now()}] Command: {' '.join(job['command'])}")
+            with open(logs_path, "a", encoding="utf-8", errors="replace") as logf:
                 self.store.update_job(job_id, {"status": "running", "message": ""}, clear_active_if_terminal=False)
                 process = subprocess.Popen(
                     job["command"],
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
                     text=True,
+                    encoding="utf-8",
+                    errors="replace",
                     bufsize=1,
+                    cwd=self.models_dir,
                 )
                 with self._lock:
                     if job_id in self._runtime:
@@ -250,12 +335,18 @@ class TrainingRunner:
                 if stop_event.is_set():
                     status = "stopped"
                     message = "training stopped by user"
+                    self._append_job_log(logs_path, f"[{_utc_now()}] Stop requested by user")
                 elif return_code == 0:
                     status = "completed"
                     message = "training completed"
+                    self._append_job_log(logs_path, f"[{_utc_now()}] Training completed successfully")
                 else:
                     status = "failed"
                     message = f"training exited with code {return_code}"
+                    self._append_job_log(
+                        logs_path,
+                        f"[{_utc_now()}] Training failed with exit code {return_code}",
+                    )
                 self.store.update_job(
                     job_id,
                     {
@@ -266,6 +357,8 @@ class TrainingRunner:
                     },
                 )
         except Exception as exc:
+            if logs_path:
+                self._append_job_log(logs_path, f"[{_utc_now()}] Exception: {repr(exc)}")
             self.store.update_job(
                 job_id,
                 {"status": "failed", "message": str(exc), "ended_at": _utc_now()},
@@ -315,4 +408,3 @@ class TrainingRunner:
             chunk = f.read(limit)
             next_offset = f.tell()
         return {"offset": offset, "next_offset": next_offset, "chunk": chunk}
-

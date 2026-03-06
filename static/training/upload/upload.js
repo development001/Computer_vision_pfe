@@ -8,12 +8,30 @@ const t = window.TrainingShared;
 
 document.addEventListener("DOMContentLoaded", () => {
   bindEvents();
+  initVideoImport();
   initialize();
 });
 
 function bindEvents() {
   document.getElementById("create-dataset-btn").addEventListener("click", createDataset);
   document.getElementById("upload-images-btn").addEventListener("click", uploadImages);
+}
+
+function initVideoImport() {
+  if (!window.TrainingUploadVideo || typeof window.TrainingUploadVideo.init !== "function") {
+    return;
+  }
+
+  window.TrainingUploadVideo.init({
+    getSelectedDatasetId: () => state.selectedDatasetId,
+    api: t.api,
+    notify: t.notify,
+    onSuccess: async () => {
+      state.datasets = await t.fetchDatasets();
+      renderDatasets();
+      await fetchImages();
+    },
+  });
 }
 
 async function initialize() {

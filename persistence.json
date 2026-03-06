@@ -7,6 +7,10 @@
     "3fdc71cc-f138-4b6c-8954-af3961248645": {
       "name": "camra hik",
       "rtsp": "rtsp://admin:dellai12@192.168.1.87:554/1"
+    },
+    "99207aa3-aeae-467f-b51f-4708a133ff8d": {
+      "name": "camera1",
+      "rtsp": "rtsp://admin:dellai12@192.168.0.57:554/1"
     }
   },
   "jobs": {}

@@ -12,6 +12,7 @@ from routes.models import create_models_blueprint
 from routes.trackers import create_trackers_blueprint
 from routes.training import create_training_blueprint
 from routes.ui import create_ui_blueprint
+from services.autodistill_grounded_sam2 import GroundedSam2AutodistillService
 from services.training_runner import TrainingRunner
 from services.training_store import TrainingStore
 
@@ -56,6 +57,7 @@ cameras.update(loaded_cameras)
 training_store = TrainingStore(TRAINING_DIR)
 training_runner = TrainingRunner(TRAINING_DIR, MODELS_DIR, training_store)
 training_runner.initialize()
+autodistill_service = GroundedSam2AutodistillService()
 
 # Restart jobs
 for jid, j_config in loaded_jobs_config.items():
@@ -88,7 +90,7 @@ app.register_blueprint(create_cameras_blueprint(cameras, jobs, jobs_lock))
 app.register_blueprint(create_jobs_blueprint(cameras, jobs, jobs_lock, available_models))
 app.register_blueprint(create_models_blueprint(MODELS_DIR, ALLOWED_EXTENSIONS, available_models))
 app.register_blueprint(create_trackers_blueprint(TRACKERS_DIR))
-app.register_blueprint(create_training_blueprint(training_store, training_runner))
+app.register_blueprint(create_training_blueprint(training_store, training_runner, autodistill_service))
 app.register_blueprint(create_ui_blueprint(STATIC_DIR))
 
 # Startup visibility for debugging route registration issues.

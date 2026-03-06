@@ -62,6 +62,15 @@
           <input type="file" id="image-upload" multiple accept=".jpg,.jpeg,.png,.bmp,.webp" />
           <button id="upload-images-btn" class="btn btn-primary">Upload</button>
         </div>
+        <div class="video-import-box">
+          <div class="video-import-title">Import From Video</div>
+          <div class="video-import-row">
+            <input type="file" id="video-upload" accept=".mp4,.avi,.mov,.mkv,.webm,.m4v" />
+            <input type="number" id="video-frame-step" min="1" value="30" />
+            <button id="upload-video-btn" class="btn btn-secondary">Extract Frames</button>
+          </div>
+          <div id="video-import-status" class="muted"></div>
+        </div>
         <div id="images-list" class="list-box"></div>
       </section>
     </div>
@@ -69,6 +78,7 @@
 </div>
 
 <script src="/static/training/shared/training-api.js"></script>
+<script src="/static/training/upload/upload-video.js"></script>
 <script src="/static/training/upload/upload.js"></script>
 </body>
 </html>

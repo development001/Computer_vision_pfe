@@ -3,6 +3,7 @@ const state = {
   selectedDatasetId: null,
   versions: [],
   activeJobId: null,
+  currentLogJobId: null,
   logOffset: 0,
   jobPollTimer: null,
   trainingApiUnavailable: false,
@@ -110,8 +111,10 @@ async function startTraining() {
       body: JSON.stringify(payload),
     });
     state.activeJobId = job.id;
+    state.currentLogJobId = job.id;
     state.logOffset = 0;
     document.getElementById("training-logs").textContent = "";
+    document.getElementById("training-status-detail").textContent = "";
     t.notify("training started");
   } catch (e) {
     t.notify(e.message);
@@ -143,6 +146,11 @@ async function pollJobs() {
 
     renderJobStatus(active);
     if (active) {
+      if (state.currentLogJobId !== active.id) {
+        state.currentLogJobId = active.id;
+        state.logOffset = 0;
+        document.getElementById("training-logs").textContent = "";
+      }
       await pollLogs(active.id);
       if (active.status !== "running" && active.status !== "starting") {
         state.activeJobId = null;
@@ -157,6 +165,7 @@ async function pollJobs() {
         state.jobPollTimer = null;
       }
       document.getElementById("training-status").textContent = "Training API unavailable (404). Restart backend to enable training features.";
+      document.getElementById("training-status-detail").textContent = "";
       return;
     }
     console.error(e);
@@ -165,14 +174,22 @@ async function pollJobs() {
 
 function renderJobStatus(job) {
   const el = document.getElementById("training-status");
+  const detailEl = document.getElementById("training-status-detail");
   if (!job) {
     el.textContent = "No training jobs yet.";
+    detailEl.textContent = "";
     return;
   }
 
   el.textContent = `Job ${job.id.slice(0, 8)} | ${job.status} | Epoch ${job.epoch_current}/${job.epoch_total} | ${(
     job.progress_pct || 0
   ).toFixed(1)}%`;
+
+  if (job.message) {
+    detailEl.textContent = `Message: ${job.message}`;
+  } else {
+    detailEl.textContent = "";
+  }
 }
 
 async function pollLogs(jobId) {

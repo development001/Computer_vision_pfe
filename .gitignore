@@ -1,0 +1,49 @@
+# Project data and artifacts
+data/
+models/
+*.pt
+*.onnx
+
+# Python cache/bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Tool/test caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Build/package outputs
+build/
+dist/
+*.egg-info/
+
+# Runtime files
+*.log
+*.pid
+*.sqlite3
+persistence.json
+
+# Environment/config secrets
+.env
+.env.*
+
+# IDE/editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db

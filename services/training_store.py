@@ -3,14 +3,17 @@ import os
 import random
 import shutil
 import threading
+import tempfile
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
+import cv2
 from werkzeug.utils import secure_filename
 
 
 ALLOWED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
+ALLOWED_VIDEO_EXTENSIONS = {".mp4", ".avi", ".mov", ".mkv", ".webm", ".m4v"}
 
 
 def _utc_now() -> str:
@@ -184,6 +187,78 @@ class TrainingStore:
             dataset["updated_at"] = _utc_now()
             self._save_registry(data)
         return saved
+
+    def add_images_from_video(self, dataset_id: str, video_file, every_nth_frame: int = 1) -> Dict[str, Any]:
+        if video_file is None or not getattr(video_file, "filename", None):
+            raise ValueError("video file is required")
+        if every_nth_frame < 1:
+            raise ValueError("every_nth_frame must be >= 1")
+
+        secure = secure_filename(video_file.filename)
+        _, ext = os.path.splitext(secure)
+        ext = ext.lower()
+        if ext not in ALLOWED_VIDEO_EXTENSIONS:
+            raise ValueError("unsupported video format")
+
+        temp_path = None
+        extracted = []
+        try:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp:
+                temp_path = tmp.name
+            video_file.save(temp_path)
+
+            cap = cv2.VideoCapture(temp_path)
+            if not cap.isOpened():
+                raise ValueError("failed to open uploaded video")
+
+            try:
+                frame_idx = 0
+                saved_idx = 0
+                with self._lock:
+                    data = self._load_registry()
+                    dataset = self._require_dataset(data, dataset_id)
+                    images_dir = self._dataset_images_dir(dataset_id)
+                    os.makedirs(images_dir, exist_ok=True)
+
+                    while True:
+                        ret, frame = cap.read()
+                        if not ret or frame is None:
+                            break
+
+                        if frame_idx % every_nth_frame == 0:
+                            image_id = str(uuid.uuid4())
+                            filename = f"{image_id}.jpg"
+                            abs_path = os.path.join(images_dir, filename)
+                            ok = cv2.imwrite(abs_path, frame, [int(cv2.IMWRITE_JPEG_QUALITY), 92])
+                            if ok:
+                                item = {
+                                    "id": image_id,
+                                    "filename": filename,
+                                    "original_name": f"{os.path.splitext(secure)[0]}_frame_{frame_idx:06d}.jpg",
+                                    "uploaded_at": _utc_now(),
+                                }
+                                dataset["images"][image_id] = item
+                                extracted.append(item)
+                                saved_idx += 1
+                        frame_idx += 1
+
+                    dataset["updated_at"] = _utc_now()
+                    self._save_registry(data)
+
+                return {
+                    "extracted_count": saved_idx,
+                    "every_nth_frame": every_nth_frame,
+                    "video_name": secure,
+                    "images": extracted,
+                }
+            finally:
+                cap.release()
+        finally:
+            if temp_path:
+                try:
+                    os.remove(temp_path)
+                except FileNotFoundError:
+                    pass
 
     def list_images(self, dataset_id: str) -> List[Dict[str, Any]]:
         with self._lock:
@@ -431,6 +506,70 @@ class TrainingStore:
                     })
             return result
 
+    @staticmethod
+    def _read_annotations_from_file(label_file: str) -> List[Dict[str, Any]]:
+        if not os.path.exists(label_file):
+            return []
+        result = []
+        with open(label_file, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                parts = line.split()
+                if len(parts) != 5:
+                    continue
+                result.append({
+                    "class_id": int(parts[0]),
+                    "x": float(parts[1]),
+                    "y": float(parts[2]),
+                    "w": float(parts[3]),
+                    "h": float(parts[4]),
+                })
+        return result
+
+    @staticmethod
+    def _annotations_to_lines(annotations: List[Dict[str, Any]], class_ids: set) -> List[str]:
+        lines = []
+        for i, item in enumerate(annotations):
+            try:
+                cid = int(item["class_id"])
+                x = float(item["x"])
+                y = float(item["y"])
+                w = float(item["w"])
+                h = float(item["h"])
+            except Exception as exc:
+                raise ValueError(f"invalid annotation at index {i}: {exc}")
+            if cid not in class_ids:
+                raise ValueError(f"class_id {cid} does not exist")
+            for value, key in ((x, "x"), (y, "y"), (w, "w"), (h, "h")):
+                if value < 0.0 or value > 1.0:
+                    raise ValueError(f"{key} must be between 0 and 1")
+            if w <= 0.0 or h <= 0.0:
+                raise ValueError("w and h must be > 0")
+            lines.append(f"{cid} {x:.6f} {y:.6f} {w:.6f} {h:.6f}")
+        return lines
+
+    def get_annotations_map(
+        self, dataset_id: str, version_id: str, image_ids: List[str]
+    ) -> Dict[str, List[Dict[str, Any]]]:
+        with self._lock:
+            data = self._load_registry()
+            dataset = self._require_dataset(data, dataset_id)
+            self._require_version(dataset, version_id)
+
+            images = dataset.get("images", {})
+            for image_id in image_ids:
+                if image_id not in images:
+                    raise KeyError("image not found")
+
+            labels_dir = self._version_labels_dir(dataset_id, version_id)
+            result = {}
+            for image_id in image_ids:
+                label_file = os.path.join(labels_dir, f"{image_id}.txt")
+                result[image_id] = self._read_annotations_from_file(label_file)
+            return result
+
     def save_annotations(
         self, dataset_id: str, version_id: str, image_id: str, annotations: List[Dict[str, Any]]
     ) -> Dict[str, Any]:
@@ -442,24 +581,7 @@ class TrainingStore:
                 raise KeyError("image not found")
 
             class_ids = {c["id"] for c in dataset.get("classes", [])}
-            lines = []
-            for i, item in enumerate(annotations):
-                try:
-                    cid = int(item["class_id"])
-                    x = float(item["x"])
-                    y = float(item["y"])
-                    w = float(item["w"])
-                    h = float(item["h"])
-                except Exception as exc:
-                    raise ValueError(f"invalid annotation at index {i}: {exc}")
-                if cid not in class_ids:
-                    raise ValueError(f"class_id {cid} does not exist")
-                for value, key in ((x, "x"), (y, "y"), (w, "w"), (h, "h")):
-                    if value < 0.0 or value > 1.0:
-                        raise ValueError(f"{key} must be between 0 and 1")
-                if w <= 0.0 or h <= 0.0:
-                    raise ValueError("w and h must be > 0")
-                lines.append(f"{cid} {x:.6f} {y:.6f} {w:.6f} {h:.6f}")
+            lines = self._annotations_to_lines(annotations, class_ids)
 
             labels_dir = self._version_labels_dir(dataset_id, version_id)
             os.makedirs(labels_dir, exist_ok=True)
@@ -477,6 +599,47 @@ class TrainingStore:
             dataset["updated_at"] = _utc_now()
             self._save_registry(data)
             return {"saved": len(lines)}
+
+    def save_annotations_bulk(
+        self,
+        dataset_id: str,
+        version_id: str,
+        annotations_by_image: Dict[str, List[Dict[str, Any]]],
+    ) -> Dict[str, Any]:
+        with self._lock:
+            data = self._load_registry()
+            dataset = self._require_dataset(data, dataset_id)
+            self._require_version(dataset, version_id)
+
+            images = dataset.get("images", {})
+            class_ids = {c["id"] for c in dataset.get("classes", [])}
+
+            lines_by_image = {}
+            for image_id, annotations in annotations_by_image.items():
+                if image_id not in images:
+                    raise KeyError("image not found")
+                lines_by_image[image_id] = self._annotations_to_lines(annotations, class_ids)
+
+            labels_dir = self._version_labels_dir(dataset_id, version_id)
+            os.makedirs(labels_dir, exist_ok=True)
+
+            saved_boxes = 0
+            for image_id, lines in lines_by_image.items():
+                label_file = os.path.join(labels_dir, f"{image_id}.txt")
+                if lines:
+                    with open(label_file, "w", encoding="utf-8") as f:
+                        f.write("\n".join(lines) + "\n")
+                else:
+                    try:
+                        os.remove(label_file)
+                    except FileNotFoundError:
+                        pass
+                saved_boxes += len(lines)
+
+            dataset["annotation_versions"][version_id]["updated_at"] = _utc_now()
+            dataset["updated_at"] = _utc_now()
+            self._save_registry(data)
+            return {"saved_images": len(lines_by_image), "saved_boxes": saved_boxes}
 
     def annotation_stats(self, dataset_id: str, version_id: str) -> Dict[str, Any]:
         with self._lock:
@@ -611,4 +774,3 @@ class TrainingStore:
                 data["active_job_id"] = None
             self._save_registry(data)
             return job
-

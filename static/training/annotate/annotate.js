@@ -16,6 +16,11 @@ const state = {
   galleryBatchSize: 120,
   isGalleryRendering: false,
   searchTimer: null,
+  autosaveTimer: null,
+  pendingAutosave: false,
+  lastSavedSignature: null,
+  autodistillAvailable: false,
+  autodistillRunning: false,
 };
 
 const t = window.TrainingShared;
@@ -43,6 +48,14 @@ const nextBtnEl = document.getElementById("annotator-next-image");
 const datasetInfoEl = document.getElementById("dataset-selected-info");
 const renameVersionBtnEl = document.getElementById("rename-version-btn");
 const deleteVersionBtnEl = document.getElementById("delete-version-btn");
+const autodistillPromptEl = document.getElementById("autodistill-prompt");
+const autodistillProviderEl = document.getElementById("autodistill-provider");
+const autodistillScopeEl = document.getElementById("autodistill-scope");
+const autodistillBoxThresholdEl = document.getElementById("autodistill-box-threshold");
+const autodistillTextThresholdEl = document.getElementById("autodistill-text-threshold");
+const autodistillReplaceEl = document.getElementById("autodistill-replace-existing");
+const autodistillRunBtnEl = document.getElementById("autodistill-run-btn");
+const autodistillStatusEl = document.getElementById("autodistill-status");
 
 if (!canvas.width) canvas.width = 960;
 if (!canvas.height) canvas.height = 540;
@@ -67,7 +80,7 @@ function bindEvents() {
   imageGalleryEl.addEventListener("click", onGalleryClick);
 
   document.getElementById("delete-box-btn").addEventListener("click", deleteSelectedBox);
-  document.getElementById("save-annotations-btn").addEventListener("click", saveAnnotations);
+  autodistillRunBtnEl.addEventListener("click", onRunAutodistill);
 
   canvas.addEventListener("mousedown", onCanvasDown);
   canvas.addEventListener("mousemove", onCanvasMove);
@@ -77,6 +90,7 @@ function bindEvents() {
 
 async function initialize() {
   try {
+    await refreshAutodistillStatus();
     state.datasets = await t.fetchDatasets();
     state.selectedDatasetId = t.resolveDatasetId(state.datasets, t.getStoredDatasetId());
     t.setStoredDatasetId(state.selectedDatasetId);
@@ -118,6 +132,7 @@ function renderDatasetSelect() {
 }
 
 async function onDatasetChange() {
+  await flushAutosave();
   state.selectedDatasetId = datasetSelectEl.value || null;
   t.setStoredDatasetId(state.selectedDatasetId);
 
@@ -151,6 +166,141 @@ async function loadDatasetContext() {
     await refreshAnnotatorData();
   } catch (e) {
     t.notify(e.message);
+  }
+}
+
+function setAutodistillStatus(message) {
+  autodistillStatusEl.textContent = message;
+}
+
+function setAutodistillRunEnabled(enabled) {
+  autodistillRunBtnEl.disabled = !enabled;
+}
+
+async function refreshAutodistillStatus() {
+  try {
+    const data = await t.api("/training/autodistill/status");
+    state.autodistillAvailable = Boolean(data.available);
+
+    if (!state.autodistillAvailable) {
+      const message = data.error || "AutoDistill unavailable";
+      setAutodistillStatus(message);
+      setAutodistillRunEnabled(false);
+      return;
+    }
+
+    const providers = Array.isArray(data.providers) ? data.providers : null;
+    if (providers && autodistillProviderEl) {
+      Array.from(autodistillProviderEl.options).forEach((opt) => {
+        opt.disabled = !providers.includes(opt.value);
+      });
+    }
+    if (data.default_provider && autodistillProviderEl) {
+      const hasDefault = Array.from(autodistillProviderEl.options).some((o) => o.value === data.default_provider);
+      if (hasDefault) autodistillProviderEl.value = data.default_provider;
+    }
+
+    const provider = data.provider ? `Provider: ${data.provider}` : "AutoDistill ready";
+    setAutodistillStatus(provider);
+    setAutodistillRunEnabled(true);
+  } catch (e) {
+    state.autodistillAvailable = false;
+    setAutodistillStatus(e.message);
+    setAutodistillRunEnabled(false);
+  }
+}
+
+function parseThresholdInput(el, name) {
+  const v = parseFloat(el.value);
+  if (Number.isNaN(v) || v < 0 || v > 1) {
+    throw new Error(`${name} must be between 0 and 1`);
+  }
+  return v;
+}
+
+function collectAutodistillImageIds(scope) {
+  if (scope === "all") {
+    return [];
+  }
+  if (scope === "filtered") {
+    return state.filteredImages.map((img) => img.id);
+  }
+  if (!state.selectedImageId) {
+    return [];
+  }
+  return [state.selectedImageId];
+}
+
+async function onRunAutodistill() {
+  if (state.autodistillRunning) return;
+  if (!state.autodistillAvailable) {
+    t.notify("autodistill service is not available");
+    return;
+  }
+  if (!state.selectedDatasetId) return t.notify("select a dataset first");
+  if (!state.selectedVersionId) return t.notify("select an annotation version first");
+  if (state.images.length === 0) return t.notify("this dataset has no images");
+
+  const scope = autodistillScopeEl.value || "current";
+  const imageIds = collectAutodistillImageIds(scope);
+  if (scope !== "all" && imageIds.length === 0) {
+    return t.notify("no images available for selected scope");
+  }
+
+  let boxThreshold;
+  let textThreshold;
+  try {
+    boxThreshold = parseThresholdInput(autodistillBoxThresholdEl, "box threshold");
+    textThreshold = parseThresholdInput(autodistillTextThresholdEl, "text threshold");
+  } catch (e) {
+    return t.notify(e.message);
+  }
+
+  const prompt = autodistillPromptEl.value.trim();
+  const provider = (autodistillProviderEl.value || "dino").trim().toLowerCase();
+  const replaceExisting = Boolean(autodistillReplaceEl.checked);
+  const payload = {
+    provider,
+    prompt,
+    image_ids: scope === "all" ? null : imageIds,
+    box_threshold: boxThreshold,
+    text_threshold: textThreshold,
+    replace_existing: replaceExisting,
+  };
+
+  await flushAutosave();
+
+  state.autodistillRunning = true;
+  setAutodistillRunEnabled(false);
+  setAutodistillStatus("Running AutoDistill...");
+
+  try {
+    const data = await t.api(
+      `/training/datasets/${state.selectedDatasetId}/annotation-versions/${state.selectedVersionId}/autodistill`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      }
+    );
+
+    const errorCount = Array.isArray(data.errors) ? data.errors.length : 0;
+    const usedProvider = data.provider ? ` using ${data.provider}` : "";
+    const summary = `Done${usedProvider}. ${data.predicted_boxes} boxes predicted on ${data.labeled_images}/${data.processed_images} images${errorCount ? `, ${errorCount} errors` : ""}.`;
+    setAutodistillStatus(summary);
+
+    if (state.selectedImageId) {
+      await loadAnnotations();
+      drawCanvas();
+    }
+
+    t.notify(summary);
+  } catch (e) {
+    setAutodistillStatus(e.message);
+    t.notify(e.message);
+  } finally {
+    state.autodistillRunning = false;
+    setAutodistillRunEnabled(state.autodistillAvailable);
   }
 }
 
@@ -232,6 +382,7 @@ function renderSourceVersionSelect() {
 }
 
 async function onVersionChange() {
+  await flushAutosave();
   state.selectedVersionId = versionSelectEl.value || null;
 
   if (state.selectedVersionId && state.images.length > 0 && !state.selectedImageId) {
@@ -469,6 +620,7 @@ function onGalleryClick(ev) {
 }
 
 async function selectImage(imageId) {
+  await flushAutosave();
   state.selectedImageId = imageId;
   updateGallerySelection();
   updateAnnotatorImageNav();
@@ -557,6 +709,8 @@ async function loadAnnotations() {
   );
   state.annotations = data.annotations || [];
   state.selectedBoxIndex = -1;
+  state.pendingAutosave = false;
+  state.lastSavedSignature = getAnnotationsSignature();
 }
 
 function clamp01(v) {
@@ -799,6 +953,10 @@ function onCanvasUp(ev) {
     }
   }
 
+  if (drawMode === "move" || drawMode === "resize" || drawMode === "draw") {
+    queueAutosave();
+  }
+
   drawMode = null;
   dragStart = null;
   dragOffset = null;
@@ -845,11 +1003,42 @@ function deleteSelectedBox() {
   state.annotations.splice(state.selectedBoxIndex, 1);
   state.selectedBoxIndex = -1;
   drawCanvas();
+  queueAutosave();
 }
 
-async function saveAnnotations() {
+function getAnnotationsSignature() {
+  return JSON.stringify(state.annotations);
+}
+
+function queueAutosave() {
+  if (!state.selectedDatasetId || !state.selectedVersionId || !state.selectedImageId) return;
+  state.pendingAutosave = true;
+  if (state.autosaveTimer) {
+    clearTimeout(state.autosaveTimer);
+  }
+  state.autosaveTimer = setTimeout(() => {
+    saveAnnotations(true);
+  }, 450);
+}
+
+async function flushAutosave() {
+  if (state.autosaveTimer) {
+    clearTimeout(state.autosaveTimer);
+    state.autosaveTimer = null;
+  }
+  if (state.pendingAutosave) {
+    await saveAnnotations(true);
+  }
+}
+
+async function saveAnnotations(silent = false) {
   if (!state.selectedDatasetId || !state.selectedVersionId || !state.selectedImageId) {
-    return t.notify("select dataset, version and image first");
+    return;
+  }
+
+  const signature = getAnnotationsSignature();
+  if (signature === state.lastSavedSignature && !state.pendingAutosave) {
+    return;
   }
 
   try {
@@ -861,8 +1050,11 @@ async function saveAnnotations() {
         body: JSON.stringify(state.annotations),
       }
     );
-    t.notify("annotations saved");
+    state.pendingAutosave = false;
+    state.lastSavedSignature = signature;
+    if (!silent) t.notify("annotations saved");
   } catch (e) {
+    state.pendingAutosave = true;
     t.notify(e.message);
   }
 }
