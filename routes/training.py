@@ -277,8 +277,9 @@ def create_training_blueprint(store, runner, autodistill_service=None):
             return jsonify({"error": "autodistill service is disabled"}), 503
 
         data = request.json or {}
+        prompt_value = data.get("prompt")
         try:
-            prompt_terms = _parse_prompt_terms(data.get("prompt"))
+            prompt_terms = _parse_prompt_terms(prompt_value)
             box_threshold = _parse_threshold(data.get("box_threshold"), "box_threshold", default=0.35)
             text_threshold = _parse_threshold(data.get("text_threshold"), "text_threshold", default=0.25)
             replace_existing = _to_bool(data.get("replace_existing"), default=False)
@@ -292,6 +293,12 @@ def create_training_blueprint(store, runner, autodistill_service=None):
         if image_ids_input is not None and not isinstance(image_ids_input, list):
             return jsonify({"error": "image_ids must be a list of image ids"}), 400
 
+        selected_class_ids_input = data.get("selected_class_ids")
+        if selected_class_ids_input is not None and not isinstance(selected_class_ids_input, list):
+            return jsonify({"error": "selected_class_ids must be a list of class ids"}), 400
+
+        target_class_id_input = data.get("target_class_id")
+
         try:
             material = store.get_training_material(dataset_id, version_id)
             classes = material["classes"]
@@ -299,30 +306,33 @@ def create_training_blueprint(store, runner, autodistill_service=None):
                 return jsonify({"error": "no classes available. create classes first"}), 400
 
             class_lookup = {c["name"].strip().lower(): c for c in classes}
+            class_by_id = {int(c["id"]): c for c in classes}
+
             selected_classes = []
-            missing_terms = []
-
-            if prompt_terms:
+            if target_class_id_input is not None:
+                target_class_id = int(target_class_id_input)
+                target_class = class_by_id.get(target_class_id)
+                if not target_class:
+                    return jsonify({"error": "target_class_id does not exist in this dataset"}), 400
+                selected_classes = [target_class]
+            elif selected_class_ids_input is not None:
                 used_ids = set()
-                for term in prompt_terms:
-                    cls = class_lookup.get(term.lower())
+                missing_class_ids = []
+                for raw_id in selected_class_ids_input:
+                    cid = int(raw_id)
+                    if cid in used_ids:
+                        continue
+                    used_ids.add(cid)
+                    cls = class_by_id.get(cid)
                     if not cls:
-                        missing_terms.append(term)
+                        missing_class_ids.append(cid)
                         continue
-                    if cls["id"] in used_ids:
-                        continue
-                    used_ids.add(cls["id"])
                     selected_classes.append(cls)
-            else:
-                selected_classes = list(classes)
-
-            if missing_terms:
-                return jsonify({
-                    "error": "prompt terms must match existing class names",
-                    "missing_terms": missing_terms,
-                }), 400
-            if not selected_classes:
-                return jsonify({"error": "prompt did not resolve to any class"}), 400
+                if missing_class_ids:
+                    return jsonify({
+                        "error": "some selected_class_ids do not exist in this dataset",
+                        "missing_class_ids": missing_class_ids,
+                    }), 400
 
             images = material["images"]
             image_by_id = {img["id"]: img for img in images}
@@ -355,8 +365,64 @@ def create_training_blueprint(store, runner, autodistill_service=None):
                     "path": store.get_image_abs_path(dataset_id, image["id"]),
                 })
 
-            ontology_map = {cls["name"]: cls["name"] for cls in selected_classes}
-            ontology_class_ids = [int(cls["id"]) for cls in selected_classes]
+            prompt_text = prompt_value.strip() if isinstance(prompt_value, str) else ""
+            ontology_map = {}
+            ontology_class_ids = []
+
+            if target_class_id_input is not None:
+                if not prompt_text:
+                    return jsonify({"error": "prompt is required when target_class_id is provided"}), 400
+                cls = selected_classes[0]
+                ontology_map = {prompt_text: cls["name"]}
+                ontology_class_ids = [int(cls["id"])]
+            elif selected_class_ids_input is not None:
+                if not selected_classes:
+                    return jsonify({"error": "select at least one class"}), 400
+
+                if prompt_text:
+                    if len(selected_classes) == 1:
+                        cls = selected_classes[0]
+                        ontology_map = {prompt_text: cls["name"]}
+                        ontology_class_ids = [int(cls["id"])]
+                    else:
+                        if len(prompt_terms) != len(selected_classes):
+                            return jsonify({
+                                "error": "when selecting multiple classes with custom prompt, provide one prompt term per class (comma-separated)",
+                            }), 400
+                        ontology_map = {}
+                        ontology_class_ids = []
+                        for idx, cls in enumerate(selected_classes):
+                            ontology_map[prompt_terms[idx]] = cls["name"]
+                            ontology_class_ids.append(int(cls["id"]))
+                else:
+                    ontology_map = {cls["name"]: cls["name"] for cls in selected_classes}
+                    ontology_class_ids = [int(cls["id"]) for cls in selected_classes]
+            else:
+                missing_terms = []
+                if prompt_terms:
+                    used_ids = set()
+                    for term in prompt_terms:
+                        cls = class_lookup.get(term.lower())
+                        if not cls:
+                            missing_terms.append(term)
+                            continue
+                        if cls["id"] in used_ids:
+                            continue
+                        used_ids.add(cls["id"])
+                        selected_classes.append(cls)
+                else:
+                    selected_classes = list(classes)
+
+                if missing_terms:
+                    return jsonify({
+                        "error": "prompt terms must match existing class names",
+                        "missing_terms": missing_terms,
+                    }), 400
+                if not selected_classes:
+                    return jsonify({"error": "prompt did not resolve to any class"}), 400
+
+                ontology_map = {cls["name"]: cls["name"] for cls in selected_classes}
+                ontology_class_ids = [int(cls["id"]) for cls in selected_classes]
 
             result = autodistill_service.run(
                 image_items=image_items,

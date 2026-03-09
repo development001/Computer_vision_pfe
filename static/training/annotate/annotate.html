@@ -87,13 +87,30 @@
             <h4>Tools</h4>
             <label>Class</label>
             <select id="annotator-class"></select>
+            <div id="annotator-class-quickpick" class="class-quickpick"></div>
+            <div class="annotator-status-row">
+              <span id="annotation-count" class="status-pill">0 boxes</span>
+              <span id="autosave-status" class="status-pill">Saved</span>
+            </div>
             <div class="annotator-actions">
               <button id="delete-box-btn" class="btn btn-secondary">Delete Box</button>
             </div>
-            <p class="muted">Draw, move, resize. Changes autosave.</p>
+            <p class="muted">Draw, move, resize. Delete selected box with Del key. Use left/right arrow to switch images.</p>
 
             <div class="autodistill-panel">
               <h4>AutoDistill</h4>
+              <label>Target classes</label>
+              <div class="autodistill-class-actions">
+                <button id="autodistill-select-all-classes" class="btn btn-secondary" type="button">Select all</button>
+                <button id="autodistill-clear-classes" class="btn btn-secondary" type="button">Clear</button>
+              </div>
+              <div id="autodistill-class-list" class="autodistill-class-list"></div>
+
+              <label class="autodistill-checkbox">
+                <input id="autodistill-use-selected-prompt" type="checkbox" checked />
+                Use selected classes as prompt
+              </label>
+
               <label for="autodistill-provider">Model</label>
               <select id="autodistill-provider">
                 <option value="dino" selected>GroundingDINO (Fast)</option>

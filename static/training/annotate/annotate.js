@@ -21,6 +21,7 @@ const state = {
   lastSavedSignature: null,
   autodistillAvailable: false,
   autodistillRunning: false,
+  autodistillSelectedClassIds: [],
 };
 
 const t = window.TrainingShared;
@@ -56,6 +57,14 @@ const autodistillTextThresholdEl = document.getElementById("autodistill-text-thr
 const autodistillReplaceEl = document.getElementById("autodistill-replace-existing");
 const autodistillRunBtnEl = document.getElementById("autodistill-run-btn");
 const autodistillStatusEl = document.getElementById("autodistill-status");
+const autodistillClassListEl = document.getElementById("autodistill-class-list");
+const autodistillSelectAllClassesEl = document.getElementById("autodistill-select-all-classes");
+const autodistillClearClassesEl = document.getElementById("autodistill-clear-classes");
+const autodistillUseSelectedPromptEl = document.getElementById("autodistill-use-selected-prompt");
+const annotatorClassEl = document.getElementById("annotator-class");
+const annotatorClassQuickpickEl = document.getElementById("annotator-class-quickpick");
+const annotationCountEl = document.getElementById("annotation-count");
+const autosaveStatusEl = document.getElementById("autosave-status");
 
 if (!canvas.width) canvas.width = 960;
 if (!canvas.height) canvas.height = 540;
@@ -81,11 +90,50 @@ function bindEvents() {
 
   document.getElementById("delete-box-btn").addEventListener("click", deleteSelectedBox);
   autodistillRunBtnEl.addEventListener("click", onRunAutodistill);
+  annotatorClassEl.addEventListener("change", onAnnotatorClassChange);
+  autodistillSelectAllClassesEl.addEventListener("click", selectAllAutodistillClasses);
+  autodistillClearClassesEl.addEventListener("click", clearAutodistillClasses);
+  autodistillClassListEl.addEventListener("change", onAutodistillClassToggle);
+  autodistillUseSelectedPromptEl.addEventListener("change", onAutodistillPromptModeChange);
+  document.addEventListener("keydown", onDocumentKeyDown);
 
   canvas.addEventListener("mousedown", onCanvasDown);
   canvas.addEventListener("mousemove", onCanvasMove);
   canvas.addEventListener("mouseup", onCanvasUp);
   canvas.addEventListener("mouseleave", onCanvasLeave);
+}
+
+function onDocumentKeyDown(ev) {
+  const tag = (ev.target?.tagName || "").toLowerCase();
+  const isTyping = tag === "input" || tag === "textarea" || tag === "select";
+  if (isTyping) return;
+
+  if (ev.key === "Delete") {
+    deleteSelectedBox();
+    ev.preventDefault();
+    return;
+  }
+  if (ev.key === "ArrowLeft") {
+    navigateAnnotatorImage(-1);
+    ev.preventDefault();
+    return;
+  }
+  if (ev.key === "ArrowRight") {
+    navigateAnnotatorImage(1);
+    ev.preventDefault();
+  }
+}
+
+function onAnnotatorClassChange() {
+  renderClassQuickPick();
+  if (state.selectedBoxIndex < 0) return;
+  const selected = state.annotations[state.selectedBoxIndex];
+  if (!selected) return;
+  const cls = parseInt(annotatorClassEl.value, 10);
+  if (Number.isNaN(cls) || selected.class_id === cls) return;
+  state.annotations[state.selectedBoxIndex] = { ...selected, class_id: cls };
+  drawCanvas();
+  queueAutosave();
 }
 
 async function initialize() {
@@ -120,11 +168,17 @@ function resetContext() {
   state.annotations = [];
   state.selectedBoxIndex = -1;
   state.imageObj = null;
+  state.pendingAutosave = false;
+  state.lastSavedSignature = null;
+  state.autodistillSelectedClassIds = [];
   renderVersionSelect();
   renderSourceVersionSelect();
   renderImageGallery();
   updateAnnotatorImageNav();
   renderClassSelect();
+  renderAutodistillClassList();
+  updateAnnotationMeta();
+  setAutosaveStatus("Saved");
 }
 
 function renderDatasetSelect() {
@@ -256,12 +310,27 @@ async function onRunAutodistill() {
     return t.notify(e.message);
   }
 
-  const prompt = autodistillPromptEl.value.trim();
+  const useSelectedPrompt = Boolean(autodistillUseSelectedPromptEl.checked);
+  const selectedClasses = getSelectedAutodistillClasses();
+  if (selectedClasses.length === 0) {
+    return t.notify("select at least one class for AutoDistill");
+  }
+  const prompt = useSelectedPrompt
+    ? selectedClasses.map((cls) => cls.name).join(", ")
+    : autodistillPromptEl.value.trim();
+  if (!useSelectedPrompt && !prompt) {
+    return t.notify("prompt is required");
+  }
+  if (!useSelectedPrompt && selectedClasses.length !== 1) {
+    return t.notify("for custom prompt, select exactly one target class");
+  }
   const provider = (autodistillProviderEl.value || "dino").trim().toLowerCase();
   const replaceExisting = Boolean(autodistillReplaceEl.checked);
   const payload = {
     provider,
     prompt,
+    selected_class_ids: selectedClasses.map((cls) => Number(cls.id)),
+    target_class_id: useSelectedPrompt ? null : Number(selectedClasses[0].id),
     image_ids: scope === "all" ? null : imageIds,
     box_threshold: boxThreshold,
     text_threshold: textThreshold,
@@ -320,6 +389,18 @@ function updateFlowInfo() {
 
   const version = state.versions.find((v) => v.id === state.selectedVersionId);
   datasetInfoEl.textContent = `${datasetName} | Version: ${version ? version.name : "Unknown"} | ${state.images.length} images`;
+}
+
+function setAutosaveStatus(text, level = "normal") {
+  autosaveStatusEl.textContent = text;
+  autosaveStatusEl.classList.remove("is-warning", "is-danger");
+  if (level === "warning") autosaveStatusEl.classList.add("is-warning");
+  if (level === "danger") autosaveStatusEl.classList.add("is-danger");
+}
+
+function updateAnnotationMeta() {
+  const count = state.annotations.length;
+  annotationCountEl.textContent = `${count} ${count === 1 ? "box" : "boxes"}`;
 }
 
 async function fetchVersions() {
@@ -470,23 +551,131 @@ async function fetchClasses() {
   if (!state.selectedDatasetId) {
     state.classes = [];
     renderClassSelect();
+    renderAutodistillClassList();
     return;
   }
 
   const data = await t.api(`/training/datasets/${state.selectedDatasetId}/classes`);
   state.classes = data.classes || [];
+  reconcileAutodistillClassSelection();
   renderClassSelect();
+  renderAutodistillClassList();
 }
 
 function renderClassSelect() {
-  const select = document.getElementById("annotator-class");
-  select.innerHTML = "";
+  const previous = annotatorClassEl.value;
+  annotatorClassEl.innerHTML = "";
+  if (state.classes.length === 0) {
+    const opt = document.createElement("option");
+    opt.value = "";
+    opt.textContent = "No classes available";
+    annotatorClassEl.appendChild(opt);
+    annotatorClassEl.disabled = true;
+    renderClassQuickPick();
+    return;
+  }
+
+  annotatorClassEl.disabled = false;
   state.classes.forEach((c) => {
     const opt = document.createElement("option");
     opt.value = c.id;
     opt.textContent = `${c.id}: ${c.name}`;
-    select.appendChild(opt);
+    annotatorClassEl.appendChild(opt);
   });
+  const hasPrevious = state.classes.some((c) => String(c.id) === previous);
+  annotatorClassEl.value = hasPrevious ? previous : String(state.classes[0].id);
+  renderClassQuickPick();
+}
+
+function renderClassQuickPick() {
+  annotatorClassQuickpickEl.innerHTML = "";
+  if (state.classes.length === 0) return;
+
+  const selectedClassId = annotatorClassEl.value;
+  state.classes.forEach((cls) => {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = `class-chip ${selectedClassId === String(cls.id) ? "active" : ""}`;
+    chip.textContent = cls.name;
+    chip.title = `Class ${cls.id}`;
+    chip.addEventListener("click", () => {
+      annotatorClassEl.value = String(cls.id);
+      renderClassQuickPick();
+    });
+    annotatorClassQuickpickEl.appendChild(chip);
+  });
+}
+
+function reconcileAutodistillClassSelection() {
+  const classIds = state.classes.map((cls) => Number(cls.id));
+  const valid = new Set(classIds);
+  state.autodistillSelectedClassIds = state.autodistillSelectedClassIds.filter((id) => valid.has(id));
+  if (state.autodistillSelectedClassIds.length === 0 && classIds.length > 0) {
+    state.autodistillSelectedClassIds = [...classIds];
+  }
+}
+
+function renderAutodistillClassList() {
+  autodistillClassListEl.innerHTML = "";
+  if (state.classes.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "muted";
+    empty.textContent = "Create classes first to run AutoDistill.";
+    autodistillClassListEl.appendChild(empty);
+    syncAutodistillPromptFromClasses();
+    return;
+  }
+
+  const selected = new Set(state.autodistillSelectedClassIds);
+  state.classes.forEach((cls) => {
+    const row = document.createElement("label");
+    row.className = "autodistill-class-item";
+    row.innerHTML = `
+      <input type="checkbox" data-class-id="${cls.id}" ${selected.has(Number(cls.id)) ? "checked" : ""} />
+      <span class="class-color-dot" style="background:${cls.color};"></span>
+      <span>${cls.id}: ${cls.name}</span>
+    `;
+    autodistillClassListEl.appendChild(row);
+  });
+  syncAutodistillPromptFromClasses();
+}
+
+function getSelectedAutodistillClasses() {
+  const selected = new Set(state.autodistillSelectedClassIds);
+  return state.classes.filter((cls) => selected.has(Number(cls.id)));
+}
+
+function onAutodistillClassToggle(ev) {
+  if (!ev.target.matches("input[type=\"checkbox\"][data-class-id]")) return;
+  const classId = Number(ev.target.dataset.classId);
+  const selected = new Set(state.autodistillSelectedClassIds);
+  if (ev.target.checked) selected.add(classId);
+  else selected.delete(classId);
+  state.autodistillSelectedClassIds = [...selected];
+  syncAutodistillPromptFromClasses();
+}
+
+function selectAllAutodistillClasses() {
+  state.autodistillSelectedClassIds = state.classes.map((cls) => Number(cls.id));
+  renderAutodistillClassList();
+}
+
+function clearAutodistillClasses() {
+  state.autodistillSelectedClassIds = [];
+  renderAutodistillClassList();
+}
+
+function onAutodistillPromptModeChange() {
+  syncAutodistillPromptFromClasses();
+}
+
+function syncAutodistillPromptFromClasses() {
+  const useSelectedPrompt = Boolean(autodistillUseSelectedPromptEl.checked);
+  autodistillPromptEl.readOnly = useSelectedPrompt;
+  if (useSelectedPrompt) {
+    const classNames = getSelectedAutodistillClasses().map((cls) => cls.name);
+    autodistillPromptEl.value = classNames.join(", ");
+  }
 }
 
 async function fetchImages() {
@@ -673,6 +862,8 @@ async function refreshAnnotatorData() {
     state.annotations = [];
     state.selectedBoxIndex = -1;
     state.imageObj = null;
+    updateAnnotationMeta();
+    setAutosaveStatus("Saved");
     drawCanvas();
     return;
   }
@@ -711,6 +902,8 @@ async function loadAnnotations() {
   state.selectedBoxIndex = -1;
   state.pendingAutosave = false;
   state.lastSavedSignature = getAnnotationsSignature();
+  updateAnnotationMeta();
+  setAutosaveStatus("Saved");
 }
 
 function clamp01(v) {
@@ -731,7 +924,7 @@ function toCanvasBox(a) {
 function toYoloBox(box) {
   const iw = state.imageObj.width;
   const ih = state.imageObj.height;
-  const classValue = document.getElementById("annotator-class").value;
+  const classValue = annotatorClassEl.value;
   const classId = classValue === "" ? null : parseInt(classValue, 10);
   return {
     class_id: classId,
@@ -871,6 +1064,11 @@ function onCanvasDown(ev) {
   if (hit >= 0) {
     state.selectedBoxIndex = hit;
     const b = toCanvasBox(state.annotations[hit]);
+    const clsId = state.annotations[hit].class_id;
+    if (state.classes.some((cls) => Number(cls.id) === Number(clsId))) {
+      annotatorClassEl.value = String(clsId);
+      renderClassQuickPick();
+    }
 
     const handle = findResizeHandle(x, y, b);
     if (handle) {
@@ -962,6 +1160,7 @@ function onCanvasUp(ev) {
   dragOffset = null;
   resizeState = null;
   canvas.style.cursor = "crosshair";
+  updateAnnotationMeta();
   drawCanvas();
 }
 
@@ -1002,6 +1201,7 @@ function deleteSelectedBox() {
   if (state.selectedBoxIndex < 0) return;
   state.annotations.splice(state.selectedBoxIndex, 1);
   state.selectedBoxIndex = -1;
+  updateAnnotationMeta();
   drawCanvas();
   queueAutosave();
 }
@@ -1013,6 +1213,7 @@ function getAnnotationsSignature() {
 function queueAutosave() {
   if (!state.selectedDatasetId || !state.selectedVersionId || !state.selectedImageId) return;
   state.pendingAutosave = true;
+  setAutosaveStatus("Unsaved changes", "warning");
   if (state.autosaveTimer) {
     clearTimeout(state.autosaveTimer);
   }
@@ -1042,6 +1243,7 @@ async function saveAnnotations(silent = false) {
   }
 
   try {
+    setAutosaveStatus("Saving...", "warning");
     await t.api(
       `/training/datasets/${state.selectedDatasetId}/annotation-versions/${state.selectedVersionId}/annotations/${state.selectedImageId}`,
       {
@@ -1052,9 +1254,11 @@ async function saveAnnotations(silent = false) {
     );
     state.pendingAutosave = false;
     state.lastSavedSignature = signature;
+    setAutosaveStatus("Saved");
     if (!silent) t.notify("annotations saved");
   } catch (e) {
     state.pendingAutosave = true;
+    setAutosaveStatus("Save failed", "danger");
     t.notify(e.message);
   }
 }
