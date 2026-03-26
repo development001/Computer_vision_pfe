@@ -1,13 +1,13 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Annotate Data - YOLO AI Server</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/static/style.css">
-<link rel="stylesheet" href="/static/training/shared/training-common.css">
-<link rel="stylesheet" href="/static/training/annotate/annotate.css">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Annotate Data - YOLO AI Server</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/training/shared/training-common.css">
+  <link rel="stylesheet" href="/static/training/annotate/annotate.css">
 </head>
 <body>
 <div class="app-layout">
@@ -40,8 +40,9 @@
       <a href="/ui/training/train">Train Data</a>
     </nav>
 
+    <!-- Annotation Setup -->
     <section class="card flow-card">
-      <h3>Annotation Flow</h3>
+      <h3>Annotation Setup</h3>
       <div class="flow-row">
         <div class="form-group">
           <label>Dataset</label>
@@ -56,61 +57,89 @@
           <button id="delete-version-btn" class="btn btn-secondary">Delete</button>
         </div>
       </div>
-      <div class="version-row">
-        <input id="version-name" placeholder="New version name (e.g. v2)" />
-        <select id="source-version"><option value="">Empty version</option></select>
-        <button id="create-version-btn" class="btn btn-primary">Create Version</button>
-      </div>
-      <div id="dataset-selected-info" class="muted">Select a dataset and version to start annotating.</div>
+
+      <details class="create-version-details">
+        <summary class="create-version-summary">Create new version</summary>
+        <div class="version-row">
+          <input id="version-name" placeholder="New version name (e.g. v2)" />
+          <select id="source-version"><option value="">Empty version</option></select>
+          <button id="create-version-btn" class="btn btn-primary">Create Version</button>
+        </div>
+      </details>
+
+      <div id="dataset-selected-info" class="setup-info muted">Select a dataset and version to start annotating.</div>
     </section>
 
-    <div class="layout-grid">
-      <section class="card images-panel">
-        <h3>Dataset Images</h3>
-        <div class="annotator-toolbar">
-          <button id="annotator-prev-image" class="btn btn-secondary" title="Previous image">Prev</button>
-          <div id="annotator-image-name" class="image-name-pill">No image selected</div>
-          <button id="annotator-next-image" class="btn btn-secondary" title="Next image">Next</button>
-          <span id="annotator-image-position" class="position-pill">0 / 0</span>
+    <!-- 3-column Annotator -->
+    <div class="annotator-grid">
+
+      <!-- Column 1: Image Gallery -->
+      <section class="images-panel">
+        <div class="panel-header">
+          <span class="panel-title">Images</span>
+          <span id="image-count-label" class="count-label"></span>
         </div>
         <div class="gallery-toolbar">
           <input id="image-search" placeholder="Search images..." />
-          <span id="image-count-label" class="muted"></span>
         </div>
         <div id="image-gallery" class="image-gallery"></div>
       </section>
 
-      <section class="card">
-        <h3>Annotator</h3>
-        <div class="annotator-layout">
-          <aside class="annotator-side">
-            <h4>Tools</h4>
-            <label>Class</label>
-            <select id="annotator-class"></select>
-            <div id="annotator-class-quickpick" class="class-quickpick"></div>
-            <div class="annotator-status-row">
-              <span id="annotation-count" class="status-pill">0 boxes</span>
-              <span id="autosave-status" class="status-pill">Saved</span>
-            </div>
-            <div class="annotator-actions">
-              <button id="delete-box-btn" class="btn btn-secondary">Delete Box</button>
-            </div>
-            <p class="muted">Draw, move, resize. Delete selected box with Del key. Use left/right arrow to switch images.</p>
+      <!-- Column 2: Canvas -->
+      <div class="canvas-panel">
+        <div class="canvas-nav-bar">
+          <button id="annotator-prev-image" class="btn btn-secondary nav-btn" title="Previous image">&#8592; Prev</button>
+          <div id="annotator-image-name" class="image-name-pill">No image selected</div>
+          <button id="annotator-next-image" class="btn btn-secondary nav-btn" title="Next image">Next &#8594;</button>
+          <span id="annotator-image-position" class="position-pill">0 / 0</span>
+        </div>
+        <div class="annotator-canvas-wrap">
+          <canvas id="annotator-canvas"></canvas>
+        </div>
+      </div>
 
-            <div class="autodistill-panel">
-              <h4>AutoDistill</h4>
+      <!-- Column 3: Tools -->
+      <aside class="tools-panel">
+
+        <!-- Class Selection -->
+        <div class="tools-section">
+          <div class="tools-section-label">Class</div>
+          <select id="annotator-class"></select>
+          <div id="annotator-class-quickpick" class="class-quickpick"></div>
+        </div>
+
+        <!-- Status & Actions -->
+        <div class="tools-section">
+          <div class="annotator-status-row">
+            <span id="annotation-count" class="status-pill">0 boxes</span>
+            <span id="autosave-status" class="status-pill">Saved</span>
+          </div>
+          <div class="annotator-actions">
+            <button id="delete-box-btn" class="btn btn-secondary btn-sm btn-block">Delete Selected Box</button>
+          </div>
+          <p class="shortcuts-hint muted">&#8592; &#8594; navigate images &nbsp;&middot;&nbsp; Del delete box</p>
+        </div>
+
+        <!-- AutoDistill (collapsible) -->
+        <details class="autodistill-panel">
+          <summary class="autodistill-summary">AutoDistill</summary>
+          <div class="autodistill-content">
+
+            <div class="autodistill-field">
               <label>Target classes</label>
               <div class="autodistill-class-actions">
                 <button id="autodistill-select-all-classes" class="btn btn-secondary" type="button">Select all</button>
                 <button id="autodistill-clear-classes" class="btn btn-secondary" type="button">Clear</button>
               </div>
               <div id="autodistill-class-list" class="autodistill-class-list"></div>
+            </div>
 
-              <label class="autodistill-checkbox">
-                <input id="autodistill-use-selected-prompt" type="checkbox" checked />
-                Use selected classes as prompt
-              </label>
+            <label class="autodistill-checkbox">
+              <input id="autodistill-use-selected-prompt" type="checkbox" checked />
+              Use selected classes as prompt
+            </label>
 
+            <div class="autodistill-field">
               <label for="autodistill-provider">Model</label>
               <select id="autodistill-provider">
                 <option value="dino" selected>GroundingDINO (Fast)</option>
@@ -118,37 +147,45 @@
                 <option value="grounded_sam2">GroundedSAM2 (Heavier)</option>
                 <option value="auto">Auto</option>
               </select>
+            </div>
 
+            <div class="autodistill-field">
               <label for="autodistill-prompt">Prompt</label>
               <input id="autodistill-prompt" placeholder="person, car, bike" />
+            </div>
 
+            <div class="autodistill-field">
               <label for="autodistill-scope">Scope</label>
               <select id="autodistill-scope">
                 <option value="current">Current image</option>
                 <option value="filtered">Filtered gallery images</option>
                 <option value="all">All dataset images</option>
               </select>
-
-              <label for="autodistill-box-threshold">Box threshold (0-1)</label>
-              <input id="autodistill-box-threshold" type="number" min="0" max="1" step="0.05" value="0.35" />
-
-              <label for="autodistill-text-threshold">Text threshold (0-1)</label>
-              <input id="autodistill-text-threshold" type="number" min="0" max="1" step="0.05" value="0.25" />
-
-              <label class="autodistill-checkbox">
-                <input id="autodistill-replace-existing" type="checkbox" />
-                Replace existing boxes
-              </label>
-
-              <button id="autodistill-run-btn" class="btn btn-primary">Run AutoDistill</button>
-              <div id="autodistill-status" class="muted">Checks service availability automatically.</div>
             </div>
-          </aside>
-          <div class="annotator-canvas-wrap">
-            <canvas id="annotator-canvas"></canvas>
+
+            <div class="threshold-row">
+              <div class="threshold-field">
+                <label for="autodistill-box-threshold">Box threshold</label>
+                <input id="autodistill-box-threshold" type="number" min="0" max="1" step="0.05" value="0.35" />
+              </div>
+              <div class="threshold-field">
+                <label for="autodistill-text-threshold">Text threshold</label>
+                <input id="autodistill-text-threshold" type="number" min="0" max="1" step="0.05" value="0.25" />
+              </div>
+            </div>
+
+            <label class="autodistill-checkbox">
+              <input id="autodistill-replace-existing" type="checkbox" />
+              Replace existing boxes
+            </label>
+
+            <button id="autodistill-run-btn" class="btn btn-primary btn-block">Run AutoDistill</button>
+            <div id="autodistill-status" class="autodistill-status-text muted">Checks service availability automatically.</div>
+
           </div>
-        </div>
-      </section>
+        </details>
+
+      </aside>
     </div>
   </main>
 </div>

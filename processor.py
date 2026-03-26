@@ -100,6 +100,29 @@ class VideoProcessor:
                     self.stats['line_counts'][cname] = {'in': 0, 'out': 0}
 
                 print(f"Info: New object detected: ID {tid} ({cname})")
+                try:
+                    location = []
+                    if i < len(xywhs):
+                        cx, cy = int(xywhs[i][0]), int(xywhs[i][1])
+                        w, h = int(xywhs[i][2]), int(xywhs[i][3])
+                        x = max(0, int(cx - w / 2))
+                        y = max(0, int(cy - h / 2))
+                        location = [x, y, int(w), int(h)]
+
+                    conf = confs[i] if i < len(confs) else 0.0
+
+                    dobj = DetectedObject(
+                        class_name=cname,
+                        object_id=tid,
+                        detection_time=datetime.now(),
+                        location=location,
+                        image=frame.copy(),
+                        inOrOut="unknown",
+                        confidence=float(conf)
+                    )
+                    dobj.post_event()
+                except Exception as e:
+                    print(f"Warning: Failed sending DetectedObject: {e}")
 
             # Line crossing counting
             if self.config.line_coords and i < len(xywhs):
@@ -128,7 +151,6 @@ class VideoProcessor:
                             y = max(0, y)
                            
 
-                            # Crop image safely
 
                             conf = confs[i] if i < len(confs) else 0.0
 
