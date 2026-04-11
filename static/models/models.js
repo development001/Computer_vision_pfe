@@ -53,13 +53,16 @@ async function fetchModels(){
 
 async function uploadModel(){
   const file = document.getElementById('model-file').files[0];
-  if(!file){ alert('Select a file first'); return;}
+  if(!file){ 
+    alert('Please select a file first'); 
+    return;
+  }
   
   const formData = new FormData();
   formData.append('file', file);
   
   const status = document.getElementById('upload-status');
-  status.innerHTML = '<span class="loading">Uploading...</span>';
+  status.textContent = 'Uploading...';
   status.className = 'status-text loading';
   
   try {
@@ -67,17 +70,17 @@ async function uploadModel(){
     const j = await r.json();
     
     if(r.ok){
-      status.innerHTML = '✓ Uploaded: ' + j.filename;
+      status.textContent = `Uploaded: ${j.filename}`;
       status.className = 'status-text success';
       document.getElementById('file-name').textContent = '';
-      document.getElementById('model-file').value = ''; // Reset input
-      fetchModels();
+      document.getElementById('model-file').value = '';
+      setTimeout(fetchModels, 500);
     }else{
-      status.innerHTML = '✗ Error: ' + j.error;
+      status.textContent = `Error: ${j.error || 'Unknown error'}`;
       status.className = 'status-text error';
     }
   } catch (e) {
-    status.innerHTML = '✗ Network Error';
+    status.textContent = 'Network error. Please try again.';
     status.className = 'status-text error';
   }
 }
@@ -90,8 +93,12 @@ async function optimizeModel(){
   const half = document.getElementById('opt-half').checked;
   const status = document.getElementById('opt-status');
   
-  if(!source){ alert('Select a source model'); return; }
-  status.innerHTML = '<span class="loading">Optimizing...</span>';
+  if(!source){ 
+    alert('Please select a source model'); 
+    return; 
+  }
+  
+  status.textContent = 'Optimizing...';
   status.className = 'status-text loading';
   
   try {
@@ -102,15 +109,15 @@ async function optimizeModel(){
     });
     const j = await r.json();
     if(r.ok){
-      status.innerHTML = `✓ ${j.message}: ${j.filename} (${j.format})`;
+      status.textContent = `Optimized: ${j.filename} (${j.format})`;
       status.className = 'status-text success';
-      fetchModels();
+      setTimeout(fetchModels, 500);
     } else {
-      status.innerHTML = '✗ Error: ' + j.error;
+      status.textContent = `Error: ${j.error || 'Optimization failed'}`;
       status.className = 'status-text error';
     }
   } catch (e) {
-    status.innerHTML = '✗ Network Error';
+    status.textContent = 'Network error. Please try again.';
     status.className = 'status-text error';
   }
 }

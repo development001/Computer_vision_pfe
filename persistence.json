@@ -11,6 +11,18 @@
     "99207aa3-aeae-467f-b51f-4708a133ff8d": {
       "name": "camera1",
       "rtsp": "rtsp://admin:dellai12@192.168.0.57:554/1"
+    },
+    "9f2bfaa0-5c6c-45f8-bf27-2ec2da5ff5a4": {
+      "name": "test",
+      "rtsp": "rtsp://192.168.1.82:554/stream"
+    },
+    "4c4f828a-b640-4c7b-a055-d8d785e4ce55": {
+      "name": "fc",
+      "rtsp": "rtsp://192.168.1.76:8080/h264.sdp"
+    },
+    "7080dc07-8b92-498b-a2fc-bdb3db0812bd": {
+      "name": "rf",
+      "rtsp": "rtsp://test:test@192.168.1.76:8080/h264.sdp"
     }
   },
   "jobs": {}

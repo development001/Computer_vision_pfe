@@ -30,8 +30,8 @@ class DetectedObject:
         extra_fields: Optional[Dict[str, object]] = None,
     ) -> None:
         url = endpoint or os.getenv(
-            "MENU_OBJECT_REMOVED_URL",
-            "http://pfebackend.coffenard.shop/menu/object-removed"
+            "MENU_OBJECT",
+            "http://pfebackend.coffenard.shop/menu/vision/detected-object"
         )
         if not url:
             return
@@ -57,7 +57,18 @@ class DetectedObject:
 
         def _post():
             try:
-                requests.post(url, data=payload, files=files, timeout=timeout)
+                resp = requests.post(url, data=payload, files=files, timeout=timeout)
+                try:
+                    resp_text = resp.text
+                except Exception:
+                    resp_text = "<unreadable response>"
+
+                if resp.ok:
+                    print(f"Posted detected object to {url} - status={resp.status_code}")
+                else:
+                    print(
+                        f"Posting detected object to {url} returned status={resp.status_code}, response={resp_text[:1000]}"
+                    )
             except Exception as e:
                 print(f"Warning: Failed posting detected object: {e}")
 

@@ -51,11 +51,11 @@
         <div class="upload-area">
           <input type="file" id="model-file" accept=".pt,.onnx" hidden/>
           <label for="model-file" class="upload-label">
-            <span class="icon">📁</span>
+            <span class="icon">📦</span>
             <span>Click to select .pt or .onnx file</span>
           </label>
           <div id="file-name" class="file-name"></div>
-          <button onclick="uploadModel()" class="btn btn-primary" style="margin-top:16px;">Upload Model</button>
+          <button onclick="uploadModel()" class="btn btn-primary" style="margin-top: 16px; width: 100%;">Upload Model</button>
           <div id="upload-status" class="status-text"></div>
         </div>
       </div>
@@ -69,38 +69,40 @@
       </div>
       
       <!-- Optimizer Card -->
-      <div class="card">
+      <div class="card" style="grid-column: 1 / -1;">
         <h3>Optimize Model</h3>
-        <div class="form-group">
-          <label>Select Source Model</label>
-          <select id="opt-source-select">
-            <option value="" disabled selected>Loading models...</option>
-          </select>
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 16px;">
+          <div class="form-group">
+            <label>Source Model</label>
+            <select id="opt-source-select">
+              <option value="" disabled selected>Loading models...</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Target Format</label>
+            <select id="opt-target-select">
+              <option value="onnx">ONNX</option>
+              <option value="tensorrt">TensorRT (engine)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Image Size</label>
+            <input type="number" id="opt-imgsz" value="640" min="64" step="64">
+          </div>
+          <div class="form-group" style="display: flex; flex-direction: column; justify-content: flex-end;">
+            <button onclick="optimizeModel()" class="btn btn-primary">Optimize</button>
+          </div>
         </div>
-        <div class="form-group">
-          <label>Target Format</label>
-          <select id="opt-target-select">
-            <option value="onnx">ONNX</option>
-            <option value="tensorrt">TensorRT (engine)</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Image Size</label>
-          <input type="number" id="opt-imgsz" value="640" min="64" step="64">
-        </div>
-        <div class="form-group">
-          <label class="checkbox-label" style="display:flex; align-items:center; gap:8px;">
-            <input type="checkbox" id="opt-dynamic" style="width:auto;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+          <label class="checkbox-label">
+            <input type="checkbox" id="opt-dynamic">
             <span>Dynamic shapes (ONNX)</span>
           </label>
-        </div>
-        <div class="form-group">
-          <label class="checkbox-label" style="display:flex; align-items:center; gap:8px;">
-            <input type="checkbox" id="opt-half" style="width:auto;">
+          <label class="checkbox-label">
+            <input type="checkbox" id="opt-half">
             <span>FP16 (TensorRT)</span>
           </label>
         </div>
-        <button onclick="optimizeModel()" class="btn btn-primary">Optimize</button>
         <div id="opt-status" class="status-text"></div>
       </div>
     </div>

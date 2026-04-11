@@ -48,28 +48,6 @@
     <div class="content-grid">
       <div class="card list-card">
         <h3>Registered Cameras</h3>
-        <div class="raw-settings">
-          <div class="raw-settings-title">Raw Stream Resolution</div>
-          <div class="raw-settings-row">
-            <select id="raw-resolution-mode">
-              <option value="default" selected>Default (camera native)</option>
-              <option value="custom">Custom resolution</option>
-            </select>
-            <input id="raw-width" type="number" min="1" placeholder="Width" disabled />
-            <input id="raw-height" type="number" min="1" placeholder="Height" disabled />
-          </div>
-        </div>
-
-        <div class="record-settings">
-          <div class="raw-settings-title">Raw Recording</div>
-          <div class="record-settings-grid">
-            <input id="record-filename-prefix" placeholder="Filename prefix (optional)" />
-          </div>
-          <div class="record-settings-actions">
-            <span class="record-settings-hint">Saved automatically to server default recordings folder. Uses maximum practical stream FPS.</span>
-          </div>
-          <div id="record-status" class="record-status">Ready to record.</div>
-        </div>
         <div id="cameras-list" class="cameras-list">
           <!-- Cameras will be populated here -->
         </div>
@@ -82,22 +60,10 @@
           <input id="cam-name" placeholder="e.g. Front Door" />
         </div>
         <div class="form-group">
-          <label for="cam-ip">IP Address</label>
-          <input id="cam-ip" placeholder="192.168.1.100" />
+          <label for="cam-rtsp">RTSP URL</label>
+          <input id="cam-rtsp" placeholder="rtsp://username:password@192.168.1.100:554/stream" />
         </div>
-        <div class="form-group">
-          <label for="cam-user">Username</label>
-          <input id="cam-user" placeholder="admin" />
-        </div>
-        <div class="form-group">
-          <label for="cam-pass">Password</label>
-          <input id="cam-pass" type="password" placeholder="password" />
-        </div>
-        <div class="form-group">
-          <label for="cam-channel">Channel</label>
-          <input id="cam-channel" placeholder="1" />
-        </div>
-        <button onclick="addCamera()" class="btn btn-primary" style="width: 100%">Add Camera</button>
+        <button onclick="addCamera()" class="btn btn-primary" style="width: 100%; margin-top: 4px;">Add Camera</button>
       </div>
     </div>
 

@@ -90,7 +90,7 @@ app.register_blueprint(create_cameras_blueprint(cameras, jobs, jobs_lock))
 app.register_blueprint(create_jobs_blueprint(cameras, jobs, jobs_lock, available_models))
 app.register_blueprint(create_models_blueprint(MODELS_DIR, ALLOWED_EXTENSIONS, available_models))
 app.register_blueprint(create_trackers_blueprint(TRACKERS_DIR))
-app.register_blueprint(create_training_blueprint(training_store, training_runner, autodistill_service))
+app.register_blueprint(create_training_blueprint(training_store, training_runner, autodistill_service, cameras))
 app.register_blueprint(create_ui_blueprint(STATIC_DIR))
 
 # Startup visibility for debugging route registration issues.

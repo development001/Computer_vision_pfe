@@ -1,7 +1,14 @@
 import mimetypes
 import re
+import os
+import threading
 
 from flask import Blueprint, Response, jsonify, request
+from services.video_recorder import RawVideoRecorder
+
+DEFAULT_RECORDINGS_DIR = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), '..', 'data', 'recordings')
+)
 
 
 def _to_bool(value, default=False):
@@ -35,8 +42,12 @@ def _parse_threshold(value, name, default):
     return out
 
 
-def create_training_blueprint(store, runner, autodistill_service=None):
+def create_training_blueprint(store, runner, autodistill_service=None, cameras=None):
     bp = Blueprint("training", __name__, url_prefix="/training")
+    
+    # Recording management
+    recordings = {}
+    recordings_lock = threading.Lock()
 
     @bp.route("/datasets", methods=["GET"])
     def list_datasets():
@@ -511,5 +522,104 @@ def create_training_blueprint(store, runner, autodistill_service=None):
             return jsonify(job)
         except KeyError:
             return jsonify({"error": "job not found"}), 404
+
+    # Recording endpoints
+    @bp.route("/record/cameras", methods=["GET"])
+    def list_cameras_for_recording():
+        """List available cameras for recording."""
+        if cameras is None:
+            return jsonify({"cameras": {}}), 200
+        return jsonify({"cameras": cameras}), 200
+
+    @bp.route("/record/status", methods=["GET"])
+    def recording_status():
+        """Get status of all active recordings."""
+        statuses = {}
+        stale_ids = []
+        with recordings_lock:
+            for cam_id, recorder in recordings.items():
+                statuses[cam_id] = recorder.status()
+                if not recorder.is_alive():
+                    stale_ids.append(cam_id)
+            for cam_id in stale_ids:
+                recordings.pop(cam_id, None)
+        return jsonify({
+            "recordings": statuses,
+            "default_output_dir": DEFAULT_RECORDINGS_DIR
+        }), 200
+
+    @bp.route("/record/<camera_id>/start", methods=["POST"])
+    def start_recording(camera_id):
+        """Start recording from a camera."""
+        if cameras is None or camera_id not in cameras:
+            return jsonify({"error": "unknown camera"}), 404
+
+        cam = cameras[camera_id]
+        data = request.json or {}
+        output_dir = os.path.abspath(DEFAULT_RECORDINGS_DIR)
+        filename_prefix = (data.get("filename_prefix") or cam.get("name") or "recording").strip()
+
+        width_raw = data.get("width")
+        height_raw = data.get("height")
+        try:
+            width = int(width_raw) if width_raw not in (None, "") else None
+            height = int(height_raw) if height_raw not in (None, "") else None
+        except Exception:
+            return jsonify({"error": "width and height must be integers"}), 400
+        
+        if (width is None) != (height is None):
+            return jsonify({"error": "width and height must be provided together"}), 400
+        if width is not None and (width <= 0 or height <= 0):
+            return jsonify({"error": "width and height must be positive integers"}), 400
+
+        try:
+            os.makedirs(output_dir, exist_ok=True)
+        except Exception as e:
+            return jsonify({"error": f"cannot access output_dir: {e}"}), 400
+
+        with recordings_lock:
+            existing = recordings.get(camera_id)
+            if existing and existing.is_alive():
+                return jsonify({"error": "recording already running for this camera"}), 409
+
+            recorder = RawVideoRecorder(
+                camera_id=camera_id,
+                rtsp_url=cam["rtsp"],
+                output_dir=output_dir,
+                filename_prefix=filename_prefix,
+                width=width,
+                height=height,
+            )
+            recordings[camera_id] = recorder
+            recorder.start()
+
+        return jsonify({
+            "started": True,
+            "camera_id": camera_id,
+            "output_dir": output_dir,
+            "width": int(width) if width else None,
+            "height": int(height) if height else None,
+        }), 201
+
+    @bp.route("/record/<camera_id>/stop", methods=["POST"])
+    def stop_recording(camera_id):
+        """Stop recording from a camera."""
+        with recordings_lock:
+            recorder = recordings.get(camera_id)
+        if recorder is None:
+            return jsonify({"error": "recording not running for this camera"}), 404
+
+        recorder.stop()
+        recorder.join(timeout=6.0)
+
+        with recordings_lock:
+            if not recorder.is_alive():
+                recordings.pop(camera_id, None)
+
+        status = recorder.status()
+        if recorder.is_alive():
+            return jsonify({"stopping": True, "status": status}), 202
+
+        return jsonify({"stopped": True, "status": status}), 200
 
     return bp

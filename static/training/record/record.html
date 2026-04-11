@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Record Data - YOLO AI Server</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/training/shared/training-common.css">
+<link rel="stylesheet" href="/static/training/record/record.css">
+</head>
+<body>
+<div class="app-layout">
+  <aside class="sidebar">
+    <div class="brand"><span>YOLO</span> AI Server</div>
+    <nav class="nav-links">
+      <a href="/ui/cameras" class="nav-item"><span class="nav-icon">CA</span><span class="nav-text">Cameras</span></a>
+      <a href="/ui/models" class="nav-item"><span class="nav-icon">MO</span><span class="nav-text">Models</span></a>
+      <a href="/ui/jobs" class="nav-item"><span class="nav-icon">JB</span><span class="nav-text">Jobs</span></a>
+      <a href="/ui/trackers" class="nav-item"><span class="nav-icon">TK</span><span class="nav-text">Trackers</span></a>
+      <a href="/ui/training" class="nav-item active"><span class="nav-icon">TR</span><span class="nav-text">Training</span></a>
+    </nav>
+  </aside>
+
+  <main class="main-content">
+    <header>
+      <div class="page-title">
+        <h1>Record Data</h1>
+        <p>Record video from RTSP cameras for dataset creation.</p>
+      </div>
+      <div class="page-actions">
+        <a href="/ui/training" class="btn btn-secondary">Training Menu</a>
+      </div>
+    </header>
+
+   
+    <div class="grid">
+      <!-- Recording Settings -->
+      <section class="card">
+        <h3>Recording Configuration</h3>
+        
+        <div class="form-group">
+          <label for="camera-select">Select Camera</label>
+          <select id="camera-select">
+            <option value="">-- Choose a camera --</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="record-prefix">Filename Prefix</label>
+          <input id="record-prefix" placeholder="e.g., dataset_2024" />
+        </div>
+
+        <div class="resolution-settings">
+          <div class="resolution-title">Resolution Settings</div>
+          <div class="form-group">
+            <select id="resolution-mode">
+              <option value="default" selected>Default (camera native)</option>
+              <option value="custom">Custom resolution</option>
+            </select>
+          </div>
+          <div class="custom-resolution" style="display:none;">
+            <input id="custom-width" type="number" min="1" placeholder="Width" disabled />
+            <input id="custom-height" type="number" min="1" placeholder="Height" disabled />
+          </div>
+        </div>
+
+        <div class="action-buttons">
+          <button id="start-recording-btn" class="btn btn-primary">Start Recording</button>
+          <button id="stop-recording-btn" class="btn btn-danger" style="display:none;">Stop Recording</button>
+        </div>
+
+        <div id="record-status" class="status-message">Ready to record.</div>
+      </section>
+
+      <!-- Active Recordings -->
+      <section class="card card-wide">
+        <h3>Active Recordings</h3>
+        <div id="recordings-list" class="recordings-list">
+          <div class="empty-state">No active recordings.</div>
+        </div>
+      </section>
+
+      <!-- Live Preview -->
+      <section class="card card-wide" id="preview-section" style="display:none;">
+        <h3>Live Preview</h3>
+        <div class="preview-container">
+          <img id="preview-img" src="" alt="Live preview" />
+          <button id="close-preview-btn" class="close-btn">×</button>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<script src="/static/training/shared/training-api.js"></script>
+<script src="/static/training/record/record.js"></script>
+</body>
+</html>
