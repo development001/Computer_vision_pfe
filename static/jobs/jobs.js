@@ -333,6 +333,9 @@ async function startJob(){
   const rtsp_read_timeout = parseFloat(document.getElementById('rtsp_read_timeout').value) || 5.0;
   const rtsp_cv2_backend = document.getElementById('rtsp_cv2_backend').value;
 
+  const shop_id_val = document.getElementById('shop-id').value.trim();
+  const shop_id = shop_id_val || null;
+
   try {
     await fetch('/jobs/start',{
       method:'POST',
@@ -342,10 +345,12 @@ async function startJob(){
         rtsp_width, rtsp_height, rtsp_fps, rtsp_buffer_size,
         rtsp_reconnect_delay, rtsp_read_timeout, rtsp_cv2_backend,
         tracker_file,
-        line_coords: currentLineCoords
+        line_coords: currentLineCoords,
+        shop_id
       })
     });
     fetchJobs();
+    if (shop_id) localStorage.setItem('shop_id', shop_id);
     
     document.querySelector('.jobs-list-card').scrollIntoView({ behavior: 'smooth' });
     

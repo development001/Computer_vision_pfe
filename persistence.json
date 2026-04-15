@@ -23,7 +23,31 @@
     "7080dc07-8b92-498b-a2fc-bdb3db0812bd": {
       "name": "rf",
       "rtsp": "rtsp://test:test@192.168.1.76:8080/h264.sdp"
+    },
+    "3e78297c-b00e-4895-978d-ec72024c1962": {
+      "name": "new cam",
+      "rtsp": "rtsp://192.168.1.80:8080/h264.sdp"
+    },
+    "a05c4556-e01d-4050-b17e-e8cef3f85756": {
+      "name": "hello",
+      "rtsp": "rtsp://test:test@192.168.1.80:8080/h264.sdp"
     }
   },
-  "jobs": {}
+  "jobs": {
+    "538cb247-fd44-4c8e-b04b-f38f451542d6": {
+      "camera_id": "a05c4556-e01d-4050-b17e-e8cef3f85756",
+      "model": "yolov8n.pt",
+      "conf": 0.25,
+      "iou": 0.7,
+      "line_coords": null,
+      "rtsp_width": 640,
+      "rtsp_height": 640,
+      "rtsp_fps": 15,
+      "rtsp_reconnect_delay": 3.0,
+      "rtsp_buffer_size": 1,
+      "rtsp_read_timeout": 5.0,
+      "rtsp_cv2_backend": "",
+      "tracker_file": "C:\\work\\computer vision\\server\\trackers\\fr.yml"
+    }
+  }
 }

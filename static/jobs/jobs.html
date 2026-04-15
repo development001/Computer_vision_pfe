@@ -70,79 +70,86 @@
           </select>
         </div>
 
-        <div class="form-group">
-          <label>Inference Settings</label>
-          <div class="row">
-            <div class="col">
-              <label>Confidence</label>
-              <input type="number" id="conf" value="0.25" step="0.01">
-            </div>
-            <div class="col">
-              <label>IOU</label>
-              <input type="number" id="iou" value="0.7" step="0.01">
-            </div>
+        <div class="form-row">
+          <div class="col">
+            <label>Confidence</label>
+            <input type="number" id="conf" value="0.25" step="0.01" min="0" max="1">
+          </div>
+          <div class="col">
+            <label>IOU Threshold</label>
+            <input type="number" id="iou" value="0.7" step="0.01" min="0" max="1">
           </div>
         </div>
 
-        <div class="collapsible-section">
-          <details>
-            <summary>Advanced Configuration</summary>
-            <div class="advanced-options">
-              <div class="config-group">
-                <h4>Line Counting</h4>
-                <label class="checkbox-label" style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
-                  <input type="checkbox" id="line-counting-check" style="width:auto;">
-                  <span>Enable Counting Line</span>
-                </label>
-                <div id="line-coords-display" style="display:none; font-size:0.9em; color:var(--text-secondary);">
-                  <span>Line Coordinates:</span> <span id="coords-values">Not set</span>
-                </div>
-              </div>
-              
-              <div class="config-group">
-                <h4>RTSP Settings</h4>
-                <div class="row" style="margin-bottom:10px;">
-                  <div class="col">
-                    <label>Width</label>
-                    <input type="number" id="rtsp_width" placeholder="camera default">
-                  </div>
-                  <div class="col">
-                    <label>Height</label>
-                    <input type="number" id="rtsp_height" placeholder="camera default">
-                  </div>
-                </div>
-                
-                <div class="row" style="margin-bottom:10px;">
-                  <div class="col">
-                    <label>FPS</label>
-                    <input type="number" id="rtsp_fps" value="15">
-                  </div>
-                  <div class="col">
-                    <label>Buffer Size</label>
-                    <input type="number" id="rtsp_buffer_size" value="1">
-                  </div>
-                </div>
+        <!-- Advanced Settings Section -->
+        <div class="settings-divider"></div>
+        <div class="settings-section-title">Advanced Settings</div>
 
-                <div class="row" style="margin-bottom:10px;">
-                  <div class="col">
-                    <label>Reconnect Delay (s)</label>
-                    <input type="number" id="rtsp_reconnect_delay" value="3.0" step="0.5">
-                  </div>
-                  <div class="col">
-                    <label>Read Timeout (s)</label>
-                    <input type="number" id="rtsp_read_timeout" value="5.0" step="0.5">
-                  </div>
-                </div>
-
-                <label>OpenCV Backend</label>
-                <select id="rtsp_cv2_backend">
-                  <option value="">Default</option>
-                  <option value="FFMPEG">FFMPEG</option>
-                  <option value="GSTREAMER">GStreamer</option>
-                </select>
-              </div>
+        <!-- RTSP Configuration -->
+        <div class="config-group">
+          <div class="config-label">RTSP Stream</div>
+          <div class="row" style="margin-bottom:10px;">
+            <div class="col">
+              <label>Width</label>
+              <input type="number" id="rtsp_width" placeholder="camera default">
             </div>
-          </details>
+            <div class="col">
+              <label>Height</label>
+              <input type="number" id="rtsp_height" placeholder="camera default">
+            </div>
+          </div>
+          
+          <div class="row" style="margin-bottom:10px;">
+            <div class="col">
+              <label>FPS</label>
+              <input type="number" id="rtsp_fps" value="15">
+            </div>
+            <div class="col">
+              <label>Buffer Size</label>
+              <input type="number" id="rtsp_buffer_size" value="1">
+            </div>
+          </div>
+
+          <div class="row" style="margin-bottom:10px;">
+            <div class="col">
+              <label>Reconnect Delay (s)</label>
+              <input type="number" id="rtsp_reconnect_delay" value="3.0" step="0.5">
+            </div>
+            <div class="col">
+              <label>Read Timeout (s)</label>
+              <input type="number" id="rtsp_read_timeout" value="5.0" step="0.5">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Backend</label>
+            <select id="rtsp_cv2_backend">
+              <option value="">Default</option>
+              <option value="FFMPEG">FFMPEG</option>
+              <option value="GSTREAMER">GStreamer</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Counting Line -->
+        <div class="config-group">
+          <div class="config-label">Counting Line</div>
+          <label class="checkbox-label">
+            <input type="checkbox" id="line-counting-check">
+            <span>Enable Counting Line</span>
+          </label>
+          <div id="line-coords-display" style="display:none; margin-top: 8px; padding: 8px; background: var(--bg-body); border-radius: 6px; font-size: 0.875rem; color: var(--text-secondary);">
+            <span>Line:</span> <span id="coords-values">Not set</span>
+          </div>
+        </div>
+
+        <!-- Shop ID -->
+        <div class="config-group">
+          <div class="config-label">Additional</div>
+          <div class="form-group">
+            <label>Shop ID (Optional)</label>
+            <input type="text" id="shop-id" placeholder="Override MENU_SHOP_ID if needed" />
+          </div>
         </div>
 
         <button onclick="startJob()" class="btn btn-primary" style="width:100%; margin-top:20px;">Start Detection Job</button>
