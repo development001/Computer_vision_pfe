@@ -3,6 +3,10 @@
     "1b049399-7d3e-41dc-8acf-813da2b2e078": {
       "name": "first test",
       "rtsp": "rtsp://test:test@192.168.1.80:8080/h264.sdp"
+    },
+    "52b573a7-2f40-4c58-bd9b-5f0c690c7d48": {
+      "name": "white cup",
+      "rtsp": "rtsp://test:test@192.168.1.76:8080/h264.sdp"
     }
   },
   "jobs": {}

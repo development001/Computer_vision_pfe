@@ -105,7 +105,7 @@ class RTSPVideoStream(threading.Thread):
         """
         start = time.time()
         with self._condition:
-            while self.frame_count <= last_frame_id:
+            while self.frame_count <= last_frame_id or self.latest_frame is None:
                 if self._stop_event.is_set():
                     return None, last_frame_id
                     
